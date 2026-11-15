@@ -1,0 +1,40 @@
+---
+import type { Category } from '../data/categories';
+import { postHref, slotLabel, ymd, yearOf, type Post } from '../lib/posts';
+import { withBase } from '../lib/base';
+interface Props { cat: Category; posts: Post[]; year?: number; allYears?: number[] }
+const { cat, posts, year, allYears } = Astro.props;
+const years = allYears ?? [...new Set(posts.map((post) => yearOf(post.data.date)))].sort((a,b) => b-a);
+const slots = [...new Set(posts.map((post) => post.data.slot))];
+const groups = [...new Set(posts.map((post) => ymd(post.data.date).slice(0,7)))].map((month) => ({month, posts:posts.filter((post) => ymd(post.data.date).startsWith(month))}));
+---
+<div class="archive" data-archive data-year-page={year ? 'true' : 'false'}>
+  <div class="archive-toolbar"><p aria-live="polite" data-archive-count>共 {posts.length} 篇文章</p><div class="archive-filters">
+    <label>年份<select data-archive-year aria-label="按年份筛选"><option value="all" data-url={withBase(`/${cat.slug}/`)}>全部年份</option>{years.map((item) => <option value={String(item)} selected={item === year} data-url={withBase(`/${cat.slug}/${item}/`)}>{item} 年</option>)}</select></label>
+    <label>时点<select data-archive-slot aria-label="按时点筛选"><option value="all">全部时点</option>{slots.map((slot) => <option value={slot}>{slotLabel(slot)}</option>)}</select></label>
+  </div></div>
+  {posts.length > 0 ? groups.map(({month,posts:entries}) => (
+    <section class="archive-month" data-archive-group aria-labelledby={`archive-${month}`}><h2 id={`archive-${month}`}>{month.slice(0,4)} 年 {Number(month.slice(5))} 月</h2><ol class="archive-list">{entries.map((post) => (
+      <li data-archive-row data-year={String(yearOf(post.data.date))} data-slot={post.data.slot}><a href={postHref(cat.slug, post.data.date, post.data.slot)}><div class="archive-meta"><time datetime={ymd(post.data.date)}>{post.data.sample ? '示例' : ymd(post.data.date)}</time><span>{slotLabel(post.data.slot)}</span></div><h3>{post.data.title}</h3><p>{post.data.summary}</p><span class="archive-arrow" aria-hidden="true">↗</span></a></li>
+    ))}</ol></section>
+  )) : <div class="archive-empty"><h2>这里即将开始积累</h2><p>第一篇内容归档后，就会按日期出现在这里。</p><a href={withBase('/')}>先浏览其他主题 <span aria-hidden="true">→</span></a></div>}
+  <div class="archive-empty" data-archive-empty hidden><h2>没有符合条件的文章</h2><p>试试其他年份或时点，也可以清除筛选浏览全部归档。</p><button type="button" data-archive-reset>清除筛选</button></div>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-archive]').forEach((archive) => {
+    const year = archive.querySelector<HTMLSelectElement>('[data-archive-year]');
+    const slot = archive.querySelector<HTMLSelectElement>('[data-archive-slot]');
+    const rows = [...archive.querySelectorAll<HTMLElement>('[data-archive-row]')];
+    if (!year || !slot) return;
+    const apply = () => {
+      let count = 0;
+      rows.forEach((row) => {const show = (year.value === 'all' || row.dataset.year === year.value) && (slot.value === 'all' || row.dataset.slot === slot.value);row.hidden = !show;if (show) count++;});
+      archive.querySelectorAll<HTMLElement>('[data-archive-group]').forEach((group) => { group.hidden = ![...group.querySelectorAll<HTMLElement>('[data-archive-row]')].some((row) => !row.hidden); });
+      const label = archive.querySelector('[data-archive-count]');if (label) label.textContent = `共 ${count} 篇文章`;
+      const empty = archive.querySelector<HTMLElement>('[data-archive-empty]');if (empty) empty.hidden = count > 0 || rows.length === 0;
+    };
+    year.addEventListener('change', () => {if (archive.dataset.yearPage === 'true') {const target = year.selectedOptions[0]?.dataset.url;if (target) window.location.assign(target);} else apply();});
+    slot.addEventListener('change', apply);
+    archive.querySelector('[data-archive-reset]')?.addEventListener('click', () => { year.value = 'all'; slot.value = 'all'; apply(); });
+  });
+</script>

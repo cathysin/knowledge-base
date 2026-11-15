@@ -1,0 +1,132 @@
+<section class="flow-field" data-flow-field data-flow-status="static" aria-label="流动光场">
+  <div class="flow-mount" data-flow-mount aria-hidden="true"></div>
+  <div class="flow-fallback" data-flow-fallback>
+    <p class="flow-fallback-title">探索你的知识主题</p>
+    <p>选择分类，继续阅读最新归档。</p>
+  </div>
+  <div class="flow-controls" data-flow-controls hidden>
+    <button type="button" data-flow-pause aria-pressed="true">暂停动效</button>
+    <button type="button" data-flow-reset>复位光场</button>
+  </div>
+  <p class="flow-hint">移动鼠标扰动光场 · 选择主题改变形态</p>
+</section>
+
+<script>
+  import { mountFlowField } from '../scripts/flow-field';
+
+  function initializeFlowFields() {
+    document.querySelectorAll<HTMLElement>('[data-flow-field]').forEach(mountFlowField);
+  }
+
+  initializeFlowFields();
+  document.addEventListener('astro:page-load', initializeFlowFields);
+</script>
+
+<style>
+  .flow-field {
+    --flow-ink: #e9f1fb;
+    --flow-muted: #a8b8cc;
+    --flow-control: #718198;
+    position: relative;
+    min-width: 0;
+    height: 420px;
+    color: var(--flow-ink);
+    isolation: isolate;
+  }
+
+  .flow-mount {
+    position: absolute;
+    inset: 0 0 26px;
+  }
+
+  .flow-mount :global(canvas) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: pan-y;
+  }
+
+  .flow-mount :global(canvas[hidden]) {
+    display: none;
+  }
+
+  .flow-fallback {
+    position: absolute;
+    inset: 48px 20px 48px;
+    display: grid;
+    align-content: center;
+    gap: 12px;
+    text-align: center;
+    color: var(--flow-muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .flow-fallback-title {
+    color: var(--flow-ink);
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+
+  .flow-controls {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .flow-controls[hidden],
+  .flow-fallback[hidden] {
+    display: none;
+  }
+
+  .flow-controls button {
+    min-block-size: 36px;
+    padding: 7px 12px;
+    border: 1px solid var(--flow-control);
+    border-radius: 8px;
+    background: #101722;
+    color: var(--flow-ink);
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+
+  .flow-controls button:hover {
+    background: #1b2a3d;
+    border-color: #accdf1;
+  }
+
+  .flow-controls button:active {
+    background: #263b54;
+  }
+
+  .flow-hint {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--flow-muted);
+  }
+
+  @media (max-width: 640px) {
+    .flow-field {
+      height: 300px;
+    }
+
+    .flow-controls button {
+      min-block-size: 44px;
+      padding-inline: 10px;
+    }
+
+    .flow-hint {
+      font-size: 0.75rem;
+    }
+  }
+</style>

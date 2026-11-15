@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "astro": "^7.4.12",
-    "pagefind": "^1.6.0"
+    "pagefind": "^1.6.0",
+    "three": "0.170.0"
   },
   "devDependencies": {
     "playwright-core": "^1.65.1"

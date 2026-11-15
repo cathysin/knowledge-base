@@ -1,45 +1,67 @@
 ---
-// 首页（T005-C）。版式：方向 A「留白大」，字号版 2，规范 v4。
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
-import SiteSearch from '../components/SiteSearch.astro';
-import QuickNav from '../components/QuickNav.astro';
-import CategoryCard from '../components/CategoryCard.astro';
-import { CATEGORIES, SITE_NAME } from '../data/categories';
-
-const SLOT_ORDER = ['post', 'mid-2', 'mid-1', 'mid', 'pre', 'daily'];
-
-// 自检用：构建时设 KB_EMPTY=all 或 KB_EMPTY=cm-knowledge,hk-ipo，可以触发空态截图；正式构建不设。
-const emptyEnv = (process.env.KB_EMPTY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-const isEmpty = (slug: string) => emptyEnv.includes('all') || emptyEnv.includes(slug);
-
-const all = await getCollection('posts');
-const byCat = CATEGORIES.map((cat) => {
-  const posts = isEmpty(cat.slug)
-    ? []
-    : all
-        .filter((e) => e.data.category === cat.slug)
-        .sort((a, b) =>
-          b.data.date.getTime() - a.data.date.getTime() ||
-          SLOT_ORDER.indexOf(a.data.slot) - SLOT_ORDER.indexOf(b.data.slot))
-        .slice(0, 3)
-        .map((e) => ({ id: e.id, title: e.data.title, date: e.data.date, slot: e.data.slot, sample: e.data.sample }));
-  return { cat, posts };
-});
-const allEmpty = byCat.every((x) => x.posts.length === 0);
+import FlowField from '../components/FlowField.astro';
+import Icon from '../components/Icon.astro';
+import { CATEGORIES } from '../data/categories';
+import { comparePosts, isEmptySlug, postHref, ymd, slotLabel } from '../lib/posts';
+import { withBase } from '../lib/base';
+const posts = (await getCollection('posts')).filter(post => !isEmptySlug(post.data.category)).sort(comparePosts);
+const categories = CATEGORIES.map(cat => ({ ...cat, posts: posts.filter(post => post.data.category === cat.slug) }));
+const firstCategory = categories[0];
+const firstPost = firstCategory.posts[0];
 ---
-<Base topic="首页" catsHref="#cats">
-  <section class="hero" aria-labelledby="page-title">
-    <h1 id="page-title" lang="en">Cathy's Know&shy;ledge Base</h1>
-    <p class="sub">各 bot 定时<wbr />推送的<wbr />归档，<wbr />按分类<wbr />和日期<wbr />整理</p>
-    <SiteSearch />
-    <QuickNav />
+<Base topic="首页" description="市场、资本管理与 AI 的个人知识库，按主题探索，按时间积累。" catsHref="#cats">
+  <section class="np-hero" data-home-experience aria-labelledby="home-title">
+    <div class="np-hero-wrap">
+      <div class="np-hero-copy">
+        <h1 id="home-title">让知识，<br />彼此连接。</h1>
+        <p>市场、资本管理与 AI。<br />为每天的新信息，找到清晰的位置。</p>
+        <form class="np-home-search" action={withBase('/search/')} method="get" role="search">
+          <label class="visually-hidden" for="home-search">搜索全部文章</label><Icon name="search" />
+          <input id="home-search" type="search" name="q" placeholder="搜索文章或关键词" enterkeyhint="search" autocomplete="off" />
+          <button type="submit" aria-label="搜索文章"><Icon /></button>
+        </form>
+        <a class="np-hero-latest" href="#recent">浏览最近更新 <Icon name="arrow-down" /></a>
+      </div>
+      <FlowField />
+      <div class="np-hero-index">
+        <div class="np-theme-nav" aria-label="选择知识主题">
+          {categories.map((cat, index) => {
+            const post = cat.posts[0];
+            return <button type="button" data-flow-topic={index} data-category-name={cat.name} data-post-title={post?.data.title ?? '浏览这个主题的归档'} data-post-href={post ? postHref(cat.slug, post.data.date, post.data.slot) : withBase(`/${cat.slug}/`)} data-category-href={withBase(`/${cat.slug}/`)} aria-pressed={index === 0 ? 'true' : 'false'}>{cat.name}</button>;
+          })}
+        </div>
+        <div class="np-selected-content" aria-live="polite">
+          <div><span class="np-selected-name" data-selected-category>{firstCategory.name}</span><a class="np-selected-article" data-selected-article href={firstPost ? postHref(firstCategory.slug, firstPost.data.date, firstPost.data.slot) : withBase(`/${firstCategory.slug}/`)}>{firstPost?.data.title ?? '浏览这个主题的归档'}</a></div>
+          <a class="np-open-category" data-selected-link href={withBase(`/${firstCategory.slug}/`)}>进入分类 <Icon name="arrow-up-right" /></a>
+        </div>
+      </div>
+    </div>
   </section>
-  <section class="cats" id="cats" aria-labelledby="cats-h">
-    <h2 id="cats-h">分类</h2>
-    {allEmpty && <p class="cats-empty">还没有归档内容，第一批推送入库后会显示在这里</p>}
-    <div class="cat-grid">
-      {byCat.map(({ cat, posts }) => <CategoryCard cat={cat} posts={posts} />)}
+  <section class="np-home-latest np-container" id="recent" aria-labelledby="recent-title">
+    <header class="np-section-head"><div><h2 id="recent-title">最近更新</h2><p>从新的信息，开始今天的阅读。</p></div><a href="#cats">按分类浏览 <Icon name="arrow-up-right" /></a></header>
+    {posts.length ? <ol class="home-feed">{posts.slice(0, 6).map(post => <li><a class="np-feed-row" href={postHref(post.data.category, post.data.date, post.data.slot)}><time datetime={ymd(post.data.date)}>{post.data.sample ? '示例' : ymd(post.data.date)}</time><h3>{post.data.title}</h3><span>{CATEGORIES.find(cat => cat.slug === post.data.category)?.name} · {slotLabel(post.data.slot)}</span><Icon name="arrow-up-right" /></a></li>)}</ol> : <div class="empty-state"><h3>知识库正在积累</h3><p>第一批内容归档后，会按时间出现在这里。</p></div>}
+  </section>
+  <section class="np-home-topics" id="cats" aria-labelledby="categories-title">
+    <div class="np-container">
+      <header class="np-section-head"><div><h2 id="categories-title">你的知识坐标</h2><p>按主题探索，按时间积累。</p></div></header>
+      <div class="np-home-topics-list">{categories.map(cat => <a class="np-topic-link" href={withBase(`/${cat.slug}/`)}><div><h3>{cat.name}</h3><p>{cat.desc}</p></div><span>{cat.posts.length} 篇 <Icon name="arrow-up-right" /></span></a>)}</div>
     </div>
   </section>
 </Base>
+<script>
+  const experience = document.querySelector<HTMLElement>('[data-home-experience]');
+  if (experience) {
+    const buttons = [...experience.querySelectorAll<HTMLButtonElement>('button[data-flow-topic]')];
+    buttons.forEach(button => button.addEventListener('click', () => {
+      buttons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+      experience.querySelector('[data-selected-category]')!.textContent = button.dataset.categoryName ?? '';
+      const article = experience.querySelector<HTMLAnchorElement>('[data-selected-article]')!;
+      article.textContent = button.dataset.postTitle ?? '';
+      article.href = button.dataset.postHref ?? '#cats';
+      experience.querySelector<HTMLAnchorElement>('[data-selected-link]')!.href = button.dataset.categoryHref ?? '#cats';
+      experience.dispatchEvent(new CustomEvent('flow-topic', { detail: { index: Number(button.dataset.flowTopic) } }));
+    }));
+  }
+</script>

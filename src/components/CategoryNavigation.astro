@@ -1,0 +1,12 @@
+---
+import { CATEGORIES } from '../data/categories';
+import { withBase } from '../lib/base';
+interface Props { current: string }
+const { current } = Astro.props;
+---
+<aside class="category-rail" aria-label="知识分类" data-pagefind-ignore="all">
+  <h2>知识分类</h2>
+  <nav aria-label="全部主题">{CATEGORIES.map((item) => <a href={withBase(`/${item.slug}/`)} aria-current={item.slug === current ? 'page' : undefined}>{item.name}</a>)}</nav>
+  <a class="category-search-link" href={withBase('/search/')}>搜索全部文章 <span aria-hidden="true">↗</span></a>
+</aside>
+<details class="mobile-categories" data-pagefind-ignore="all"><summary>切换主题 <span>{CATEGORIES.find((item) => item.slug === current)?.name}</span></summary><nav aria-label="手机全部主题">{CATEGORIES.map((item) => <a href={withBase(`/${item.slug}/`)} aria-current={item.slug === current ? 'page' : undefined}>{item.name}</a>)}</nav></details>

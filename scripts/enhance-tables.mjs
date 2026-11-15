@@ -17,14 +17,16 @@ for (const f of files) {
   let html = readFileSync(f, 'utf8');
   if (!/<table[\s>]/i.test(html) || html.includes('class="table-wrap"')) continue;
   let n = 0;
-  const next = html.replace(/<table\b[\s\S]*?<\/table>/gi, (table) => {
+  const next = html.replace(/<table\b[\s\S]*?<\/table>/gi, (table, offset) => {
     tables++;
     n++;
     const capId = `table-caption-${n}`;
+    const heading = [...html.slice(0, offset).matchAll(/<h[23]\b[^>]*>([\s\S]*?)<\/h[23]>/gi)].at(-1)?.[1]?.replace(/<[^>]+>/g, '').trim();
+    const caption = (heading || '文章数据表').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const labels = [...table.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)].map((m) => m[1].replace(/<[^>]+>/g, '').trim());
     let out = table;
     if (!/<caption\b/i.test(out)) {
-      out = out.replace(/<table\b[^>]*>/i, (open) => `${open}<caption class="visually-hidden" id="${capId}">数据表</caption>`);
+      out = out.replace(/<table\b[^>]*>/i, (open) => `${open}<caption class="visually-hidden" id="${capId}">${caption}</caption>`);
     } else if (!/id=/.test(out.match(/<caption\b[^>]*>/i)?.[0] ?? '')) {
       out = out.replace(/<caption\b/i, `<caption id="${capId}"`);
     } else {

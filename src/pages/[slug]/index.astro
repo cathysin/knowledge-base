@@ -1,108 +1,29 @@
 ---
-// 分类列表页 /<slug>/（方案 7.2）：按年分组、按日期倒序；当年列在本页，更早年份另页。
-// cm-knowledge 例外：正文带「课程位置」的按学习路径排（编号升序 + 卡片网格），因为它是课程不是日报。
 import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
-import CatSwitch from '../../components/CatSwitch.astro';
+import CategoryNavigation from '../../components/CategoryNavigation.astro';
+import ArchiveList from '../../components/ArchiveList.astro';
 import LessonCard from '../../components/LessonCard.astro';
-import { CATEGORIES, splitDigits } from '../../data/categories';
-import { postsInCategory, postHref, slotLabel, ymd, yearOf, parseLesson, compareSerial, type Lesson } from '../../lib/posts';
+import { CATEGORIES } from '../../data/categories';
+import { postsInCategory, parseLesson, compareSerial, type Lesson } from '../../lib/posts';
 import { withBase } from '../../lib/base';
-
-export function getStaticPaths() {
-  return CATEGORIES.map((cat) => ({ params: { slug: cat.slug }, props: { cat } }));
-}
-
+export function getStaticPaths() {return CATEGORIES.map((cat) => ({ params: { slug: cat.slug }, props: { cat } }));}
 const { cat } = Astro.props;
 const posts = await postsInCategory(cat.slug);
-
-// 带「课程位置」的文章 → 课程视图；解析不出编号的分类继续走原来的列表
-const lessons = posts
-  .map((post) => ({ post, lesson: parseLesson(post.body) }))
-  .filter((x): x is { post: (typeof posts)[number]; lesson: Lesson } => x.lesson !== null)
-  .sort((a, b) => compareSerial(a.lesson.serial, b.lesson.serial));
-
+const lessons = posts.map((post) => ({post,lesson:parseLesson(post.body)})).filter((item):item is {post:(typeof posts)[number];lesson:Lesson} => item.lesson !== null).sort((a,b) => compareSerial(a.lesson.serial,b.lesson.serial));
 const isCourse = lessons.length > 0;
-
-// 按主题分组，主题内已按编号升序
-interface TopicGroup { topic: string; topicIndex: number; topicTotal: number; section: string; items: typeof lessons }
-const topics: TopicGroup[] = [];
-for (const it of lessons) {
-  const last = topics[topics.length - 1];
-  if (last && last.topic === it.lesson.topic) {
-    last.items.push(it);
-  } else {
-    topics.push({
-      topic: it.lesson.topic,
-      topicIndex: it.lesson.topicIndex,
-      topicTotal: it.lesson.topicTotal,
-      section: it.lesson.section,
-      items: [it],
-    });
-  }
-}
-
-// 普通列表：按年分组、日期倒序
-const years = [...new Set(posts.map((p) => yearOf(p.data.date)))].sort((a, b) => b - a);
-const currentYear = years[0];
-const currentPosts = posts.filter((p) => yearOf(p.data.date) === currentYear);
-const olderYears = years.filter((y) => y !== currentYear);
+const unnumberedPosts = posts.filter(post => !parseLesson(post.body));
+interface TopicGroup {topic:string;topicIndex:number;topicTotal:number;section:string;items:typeof lessons}
+const topics:TopicGroup[]=[];
+for (const item of lessons) {const previous=topics[topics.length-1];if(previous && previous.topic===item.lesson.topic) previous.items.push(item);else topics.push({topic:item.lesson.topic,topicIndex:item.lesson.topicIndex,topicTotal:item.lesson.topicTotal,section:item.lesson.section,items:[item]});}
 ---
-
 <Base topic={cat.name} description={cat.desc}>
-  <div class="page page-list" data-pagefind-body>
-    <Breadcrumb items={[
-      { label: '首页', href: withBase('/') },
-      { label: cat.name, href: withBase(`/${cat.slug}/`), current: true },
-    ]} />
-    <h1 class="page-title">
-      {splitDigits(cat.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}
-    </h1>
-    <p class="page-src">来源：{cat.sourceBot}</p>
-    <CatSwitch current={cat.slug} />
-
-    {isCourse ? (
-      topics.map((t) => (
-        <section class="lesson-topic" aria-labelledby={`topic-${t.topicIndex}`}>
-          <header class="lesson-topic-head">
-            <p class="kicker">主题 <span class="num">{t.topicIndex}</span> / <span class="num">{t.topicTotal}</span> · 学习路径</p>
-            <h2 class="lesson-topic-title" id={`topic-${t.topicIndex}`}>{t.topic}</h2>
-            <p class="lesson-topic-meta">
-              共 <span class="num">{t.items.length}</span> 课 · 编号 {t.items[0].lesson.serial} – {t.items[t.items.length - 1].lesson.serial} · 按顺序读
-            </p>
-          </header>
-          <div class="lesson-grid">
-            {t.items.map((it, i) => (
-              <LessonCard post={it.post} lesson={it.lesson} order={i + 1} />
-            ))}
-          </div>
-        </section>
-      ))
-    ) : posts.length === 0 ? (
-      <p class="page-empty">这个分类还没有归档文章。 <a href={withBase("/")}>回到首页</a></p>
-    ) : (
-      <section class="year-block" aria-labelledby={`year-${currentYear}`}>
-        <h2 class="year-h" id={`year-${currentYear}`}>{currentYear}</h2>
-        <ol class="year-list">
-          {currentPosts.map((p) => (
-            <li>
-              <a href={postHref(cat.slug, p.data.date, p.data.slot)}>
-                <span class="post-when">{p.data.sample ? '示例' : ymd(p.data.date)} · {slotLabel(p.data.slot)}</span>
-                <span class="post-title">{p.data.title}</span>
-                <span class="post-summary">{p.data.summary}</span>
-              </a>
-            </li>
-          ))}
-        </ol>
-      </section>
-    )}
-
-    {!isCourse && olderYears.length > 0 && (
-      <p class="earlier-years">
-        更早年份：{olderYears.map((y, i) => (
-          <>{i > 0 ? '、' : ''}<a href={withBase(`/${cat.slug}/${y}/`)}>{y}</a></>
-        ))}
-      </p>
-    )}
+  <div class="page page-list" data-pagefind-ignore="all">
+    <Breadcrumb items={[{label:'首页',href:withBase('/')},{label:cat.name,href:withBase(`/${cat.slug}/`),current:true}]} />
+    <div class="category-layout"><CategoryNavigation current={cat.slug} /><div class="category-main">
+      <header class="category-heading"><div><h1 class="page-title">{cat.name}</h1><p class="category-description">{cat.desc}</p></div><p class="archive-total"><strong>{isCourse?lessons.length:posts.length}</strong><span>{isCourse?'课学习路径':'篇归档'}</span></p></header>
+      {isCourse ? topics.map((topic) => <section class="lesson-topic" aria-labelledby={`topic-${topic.topicIndex}`}><header class="lesson-topic-head"><p class="lesson-topic-position">主题 {topic.topicIndex} / {topic.topicTotal}</p><h2 class="lesson-topic-title" id={`topic-${topic.topicIndex}`}>{topic.topic}</h2><p class="lesson-topic-meta">共 {topic.items.length} 课 · 编号 {topic.items[0].lesson.serial} – {topic.items[topic.items.length-1].lesson.serial} · 按顺序读</p></header><div class="lesson-grid">{topic.items.map((item,index)=><LessonCard post={item.post} lesson={item.lesson} order={index+1} />)}</div></section>) : <ArchiveList cat={cat} posts={posts} />}
+      {isCourse && unnumberedPosts.length > 0 && <section class="lesson-topic"><header class="lesson-topic-head"><h2 class="lesson-topic-title">更多课程归档</h2><p class="lesson-topic-meta">这些课程尚未标注编号，按日期浏览。</p></header><ArchiveList cat={cat} posts={unnumberedPosts} /></section>}
+    </div></div>
   </div>
 </Base>
