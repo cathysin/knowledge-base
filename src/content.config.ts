@@ -18,7 +18,8 @@ const posts = defineCollection({
     summary: z.string().min(1).max(120),
     as_of: z.coerce.date().optional(),
     sources: z.array(z.string()).optional(),
-    compliance_checked: z.literal(true),
+    // T012-B：导入的推送没经过合规审查，不能写 true；改成可选，导入脚本不写这一项。
+    compliance_checked: z.boolean().optional(),
     updated: z.coerce.date().optional(),
     // 方案 6.1 之外加的一项：示例文章标记。真实文章不写或写 false；上线前删掉全部 sample 文章。
     sample: z.boolean().optional(),
