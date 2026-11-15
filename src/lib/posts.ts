@@ -47,3 +47,40 @@ export function assertBody(post: Post): void {
     throw new Error(`文章正文为空，构建失败：${post.id}`);
   }
 }
+
+/** 课程位置：cm-knowledge 的正文首部有「主题 1/14 货币市场基金 · 利率与流动性基础 · 1.1.1」。 */
+export interface Lesson {
+  /** 主题序号与总数，如 1 / 14 */
+  topicIndex: number;
+  topicTotal: number;
+  /** 主题名，如「货币市场基金」 */
+  topic: string;
+  /** 小节名，如「利率与流动性基础」 */
+  section: string;
+  /** 课程编号，如 1.1.1 */
+  serial: string;
+}
+
+export function parseLesson(body?: string): Lesson | null {
+  if (!body) return null;
+  const m = body.match(/课程位置[:：]\s*主题\s*(\d+)\s*\/\s*(\d+)\s*([^·\n]+?)\s*·\s*([^·\n]+?)\s*·\s*(\d+(?:\.\d+)+)/);
+  if (!m) return null;
+  return {
+    topicIndex: Number(m[1]),
+    topicTotal: Number(m[2]),
+    topic: m[3].trim(),
+    section: m[4].trim(),
+    serial: m[5],
+  };
+}
+
+/** 课程编号比较：1.1.2 排在 1.1.10 前面。 */
+export function compareSerial(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}

@@ -56,6 +56,20 @@ front matter 必填：`title`、`date`、`category`（六个 slug 之一）、`s
 
 **缺口**：etf-2835 的 11-10、11-11 两篇缺失；若要补，需要当日的 02835 市价与净值，可在 MoneyDJ 历史净值表查到后照同样的结构补回。
 
+## 本轮（T014）：cm-knowledge 改成课程目录视图
+
+问题：分类页原本和日报一样按日期倒序排，但 cm-knowledge 是课程，按日期读等于从第 1 课倒着读。
+
+改动：
+
+- `src/lib/posts.ts` 新增 `parseLesson()`：从正文「课程位置：主题 1/14 货币市场基金 · 利率与流动性基础 · 1.1.1」解析出主题、小节、编号；新增 `compareSerial()` 按数字段比较，`1.1.2` 排在 `1.1.10` 前面
+- `src/components/LessonCard.astro`：新增课程卡片（编号 28px + 日期 + 标题 + 3 行摘要 + 小节 chip），整卡是一个链接
+- `src/pages/[slug]/index.astro`：能解析出编号的分类走课程视图（按主题分组 + 编号升序 + 卡片网格），解析不出的仍走原年份列表，其他 5 个分类不受影响
+- `src/pages/[slug]/[entry]/index.astro`：文章页顶部显示「1.1.5 · 主题 1/14 货币市场基金 · 利率与流动性基础」；上下篇按编号算，文案改为「上一课／下一课」；正文首部与页头重复的「日期／来源 bot／课程位置」三条列表用 CSS 隐藏（`.prose.is-course > ul:first-child`）
+- `global.css`：内页加 `margin-inline: auto` 居中；`.prose h3` 提到 20px，让「正文／香港例子／反思问题」成为清晰分节
+
+以后新增 cm-knowledge 文章，只要正文保留 `- 课程位置：主题 X/Y 名称 · 小节 · 编号` 这一行，就会自动进入课程视图并排好序。
+
 ## 已知问题
 
 Firefox 不支持 `text-wrap: pretty`；Firefox 320px 下首页标题可能出现「Cathy's Know- / ledge Base」。

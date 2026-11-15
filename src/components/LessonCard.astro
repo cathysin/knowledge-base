@@ -1,0 +1,28 @@
+---
+// 课程卡片（cm-knowledge 专用）：编号是学习路径的顺序，不是日期顺序。
+// 卡片整体是一个链接：标题是主链接，编号与日期只作信息展示，避免多重可聚焦元素。
+import { ymd, type Post, type Lesson } from '../lib/posts';
+import { postHref } from '../lib/posts';
+import { splitDigits } from '../data/categories';
+
+interface Props {
+  post: Post;
+  lesson: Lesson;
+  /** 组内序号，用于「第 N 课」这类补充信息 */
+  order: number;
+}
+const { post, lesson, order } = Astro.props;
+---
+
+<a class="lesson-card" href={postHref(post.data.category, post.data.date, post.data.slot)}>
+  <span class="lesson-top">
+    <span class="lesson-serial num">{lesson.serial}</span>
+    <span class="lesson-day"><span class="visually-hidden">发布</span>{ymd(post.data.date)}</span>
+  </span>
+  <h3 class="lesson-title">{splitDigits(post.data.title).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}</h3>
+  <span class="lesson-excerpt">{post.data.summary}</span>
+  <span class="lesson-foot">
+    <span class="chip">{lesson.section}</span>
+    <span class="visually-hidden">第 {order} 课</span>
+  </span>
+</a>

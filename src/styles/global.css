@@ -321,7 +321,7 @@ main { padding: 0 var(--s48); }
 }
 
 /* ---------- 内页通用（分类列表、文章、搜索、404；方案 7.2–7.5） ---------- */
-.page { max-inline-size: 880px; padding-block: var(--s48) var(--s96); }
+.page { max-inline-size: 880px; margin-inline: auto; padding-block: var(--s48) var(--s96); }
 .page-article { max-inline-size: 720px; }
 .page-title { font-size: var(--fs-36); font-weight: 600; line-height: var(--lh-display); text-wrap: balance; }
 .page-src, .page-lead { margin-block-start: var(--s8); font-size: var(--fs-14); color: var(--c-muted); }
@@ -358,13 +358,83 @@ main { padding: 0 var(--s48); }
 .year-list a:hover .post-title { text-decoration-thickness: 2px; }
 .earlier-years { margin-block-start: var(--s24); font-size: var(--fs-16); }
 
+/* ---------- 课程目录（cm-knowledge 专用，按学习路径排） ---------- */
+.kicker { font-size: var(--fs-14); color: var(--c-muted); }
+.lesson-topic { margin-block-start: var(--s48); }
+.lesson-topic + .lesson-topic { margin-block-start: var(--s64); }
+.lesson-topic-title {
+  margin-block-start: var(--s8);
+  font-size: var(--fs-28);
+  font-weight: 600;
+  line-height: 1.4;
+  text-wrap: balance;
+}
+.lesson-topic-meta { margin-block-start: var(--s8); font-size: var(--fs-14); color: var(--c-muted); }
+
+.lesson-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--s24);
+  margin-block-start: var(--s24);
+}
+.lesson-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: var(--s8);
+  padding: var(--s24);
+  color: var(--c-ink);
+  background: var(--c-bg);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+}
+.lesson-card:hover { border-color: var(--c-ctrl); }
+.lesson-card:active { transform: translateY(1px); }
+.lesson-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s16); }
+.lesson-serial {
+  font-size: var(--fs-28);
+  font-weight: 600;
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-display);
+}
+.lesson-day { flex: none; font-size: var(--fs-14); color: var(--c-muted); white-space: nowrap; }
+.lesson-title { font-size: var(--fs-20); font-weight: 600; line-height: 1.4; text-wrap: balance; }
+.lesson-card:hover .lesson-title { text-decoration: underline; text-underline-offset: 4px; }
+.lesson-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: var(--fs-14);
+  line-height: var(--lh-body);
+  color: var(--c-muted);
+  text-wrap: pretty;
+}
+.lesson-foot { display: flex; align-items: center; gap: var(--s8); margin-block-start: var(--s8); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 24px;
+  padding-inline: var(--s8);
+  font-size: var(--fs-12);
+  color: var(--c-muted);
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+}
+
 /* 文章页（6.2 / 7.3） */
+.article-lesson { margin-block-end: var(--s8); font-size: var(--fs-14); color: var(--c-muted); }
 .article-meta { margin-block-start: var(--s16); font-size: var(--fs-14); color: var(--c-muted); }
 .article-summary { margin-block: var(--s16); font-size: var(--fs-16); }
 .prose { max-inline-size: 720px; font-size: var(--fs-16); line-height: 1.75; overflow-wrap: anywhere; }
 .prose :first-child { margin-block-start: 0; }
 .prose p + p, .prose ul + p, .prose ol + p, .prose p + ul, .prose p + ol { margin-block-start: var(--s16); }
 .prose h2, .prose h3 { margin-block-start: var(--s32); margin-block-end: var(--s16); }
+.prose h3 { font-size: var(--fs-20); line-height: 1.4; }
+/* 课程文章：正文首部的「日期／来源 bot／课程位置」与页头重复，不再重复显示 */
+.prose.is-course > ul:first-child { display: none; }
+.prose.is-course > :nth-child(2) { margin-block-start: var(--s24); }
 .prose ul, .prose ol { padding-inline-start: var(--s24); }
 .prose li + li { margin-block-start: var(--s8); }
 .article-sources, .article-tags, .article-nav { margin-block-start: var(--s32); }
@@ -427,6 +497,11 @@ main { padding: 0 var(--s48); }
   .page-title { font-size: var(--fs-28); }
   .crumbs a, .crumbs span { min-block-size: 44px; }
   .cat-switch a { min-block-size: 44px; }
+  .lesson-topic { margin-block-start: var(--s32); }
+  .lesson-topic-title { font-size: var(--fs-20); }
+  .lesson-grid { grid-template-columns: minmax(0, 1fr); gap: var(--s16); margin-block-start: var(--s16); }
+  .lesson-card { padding: var(--s16); }
+  .lesson-serial { font-size: var(--fs-20); }
   .year-list a { flex-direction: column; align-items: start; gap: var(--s8); }
   .year-list .post-when, .year-list .post-title, .year-list .post-summary { min-inline-size: 0; flex: 1 1 auto; }
   .article-nav a { min-block-size: 44px; }

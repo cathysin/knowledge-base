@@ -6,7 +6,7 @@ import Base from '../../../layouts/Base.astro';
 import Breadcrumb from '../../../components/Breadcrumb.astro';
 import CatSwitch from '../../../components/CatSwitch.astro';
 import { CATEGORIES, splitDigits } from '../../../data/categories';
-import { postsInCategory, postHref, slotLabel, ymd, yearOf, comparePosts, assertBody, type Post } from '../../../lib/posts';
+import { postsInCategory, postHref, slotLabel, ymd, yearOf, comparePosts, compareSerial, parseLesson, assertBody, type Post, type Lesson } from '../../../lib/posts';
 import { withBase } from '../../../lib/base';
 
 export async function getStaticPaths() {
@@ -42,13 +42,27 @@ const yearPosts = kind === 'year' && year
 let Content: Awaited<ReturnType<typeof render>>['Content'] | undefined;
 let prev: Post | undefined;
 let next: Post | undefined;
+let lessonInfo: Lesson | null = null;
+// 课程模式下「上一课」是编号更小的一篇，「下一篇」是日期更早的一篇；语义相反，必须分开算
+let isCourse = false;
 if (kind === 'article' && post) {
-  const siblings = (await getCollection('posts'))
-    .filter((p) => p.data.category === cat.slug)
-    .sort(comparePosts);
+  lessonInfo = parseLesson(post.body);
+  const all = (await getCollection('posts')).filter((p) => p.data.category === cat.slug);
+  const withLesson = all
+    .map((p) => ({ post: p, lesson: parseLesson(p.body) }))
+    .filter((x): x is { post: Post; lesson: Lesson } => x.lesson !== null);
+  isCourse = withLesson.length > 0;
+  const siblings = isCourse
+    ? withLesson.sort((a, b) => compareSerial(a.lesson.serial, b.lesson.serial)).map((x) => x.post)
+    : all.sort(comparePosts);
   const i = siblings.findIndex((p) => p.id === post.id);
-  next = i > 0 ? siblings[i - 1] : undefined; // 更新的一篇
-  prev = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : undefined; // 更早的一篇
+  if (isCourse) {
+    prev = i > 0 ? siblings[i - 1] : undefined;
+    next = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : undefined;
+  } else {
+    next = i > 0 ? siblings[i - 1] : undefined; // 更新的一篇
+    prev = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : undefined; // 更早的一篇
+  }
   Content = (await render(post)).Content;
 }
 
@@ -94,6 +108,14 @@ const metaDate = post ? (post.data.sample ? '示例' : ymd(post.data.date)) : ''
         { label: '首页', href: withBase('/') },
         { label: cat.name, href: withBase(`/${cat.slug}/`) },
       ]} />
+      {lessonInfo && (
+        <p class="article-lesson">
+          <span class="num">{lessonInfo.serial}</span>
+          {' · 主题 '}
+          <span class="num">{lessonInfo.topicIndex}</span>/<span class="num">{lessonInfo.topicTotal}</span>
+          {` ${lessonInfo.topic} · ${lessonInfo.section}`}
+        </p>
+      )}
       <h1 class="page-title" data-pagefind-meta="title">{post.data.title}</h1>
       <p class="article-meta">
         <span class="visually-hidden" data-pagefind-meta="category">{cat.name}</span>
@@ -105,7 +127,7 @@ const metaDate = post ? (post.data.sample ? '示例' : ymd(post.data.date)) : ''
         {post.data.as_of ? ` · 数据截至 ${ymd(post.data.as_of)}` : ''}
       </p>
       <p class="article-summary">{post.data.summary}</p>
-      <div class="prose">
+      <div class:list={['prose', { 'is-course': isCourse }]}>
         <Content />
       </div>
       {post.data.sources && post.data.sources.length > 0 && (
@@ -123,10 +145,10 @@ const metaDate = post ? (post.data.sample ? '示例' : ymd(post.data.date)) : ''
         <nav class="article-nav" aria-label="同分类前后文章">
           <ul>
             {prev && (
-              <li><a href={postHref(cat.slug, prev.data.date, prev.data.slot)}>上一篇：{prev.data.title}</a></li>
+              <li><a href={postHref(cat.slug, prev.data.date, prev.data.slot)}>{isCourse ? '上一课' : '上一篇'}：{prev.data.title}</a></li>
             )}
             {next && (
-              <li><a href={postHref(cat.slug, next.data.date, next.data.slot)}>下一篇：{next.data.title}</a></li>
+              <li><a href={postHref(cat.slug, next.data.date, next.data.slot)}>{isCourse ? '下一课' : '下一篇'}：{next.data.title}</a></li>
             )}
           </ul>
         </nav>
