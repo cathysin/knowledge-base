@@ -3,27 +3,19 @@ import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
 import CategoryNavigation from '../../components/CategoryNavigation.astro';
 import ArchiveList from '../../components/ArchiveList.astro';
-import LessonCard from '../../components/LessonCard.astro';
 import { CATEGORIES } from '../../data/categories';
-import { postsInCategory, parseLesson, compareSerial, type Lesson } from '../../lib/posts';
+import { postsInCategory } from '../../lib/posts';
 import { withBase } from '../../lib/base';
 export function getStaticPaths() {return CATEGORIES.map((cat) => ({ params: { slug: cat.slug }, props: { cat } }));}
 const { cat } = Astro.props;
 const posts = await postsInCategory(cat.slug);
-const lessons = posts.map((post) => ({post,lesson:parseLesson(post.body)})).filter((item):item is {post:(typeof posts)[number];lesson:Lesson} => item.lesson !== null).sort((a,b) => compareSerial(a.lesson.serial,b.lesson.serial));
-const isCourse = lessons.length > 0;
-const unnumberedPosts = posts.filter(post => !parseLesson(post.body));
-interface TopicGroup {topic:string;topicIndex:number;topicTotal:number;section:string;items:typeof lessons}
-const topics:TopicGroup[]=[];
-for (const item of lessons) {const previous=topics[topics.length-1];if(previous && previous.topic===item.lesson.topic) previous.items.push(item);else topics.push({topic:item.lesson.topic,topicIndex:item.lesson.topicIndex,topicTotal:item.lesson.topicTotal,section:item.lesson.section,items:[item]});}
 ---
 <Base topic={cat.name} description={cat.desc}>
   <div class="page page-list" data-pagefind-ignore="all">
     <Breadcrumb items={[{label:'首页',href:withBase('/')},{label:cat.name,href:withBase(`/${cat.slug}/`),current:true}]} />
     <div class="category-layout"><CategoryNavigation current={cat.slug} /><div class="category-main">
-      <header class="category-heading"><div><h1 class="page-title">{cat.name}</h1><p class="category-description">{cat.desc}</p></div><p class="archive-total"><strong>{isCourse?lessons.length:posts.length}</strong><span>{isCourse?'课学习路径':'篇归档'}</span></p></header>
-      {isCourse ? topics.map((topic) => <section class="lesson-topic" aria-labelledby={`topic-${topic.topicIndex}`}><header class="lesson-topic-head"><p class="lesson-topic-position">主题 {topic.topicIndex} / {topic.topicTotal}</p><h2 class="lesson-topic-title" id={`topic-${topic.topicIndex}`}>{topic.topic}</h2><p class="lesson-topic-meta">共 {topic.items.length} 课 · 编号 {topic.items[0].lesson.serial} – {topic.items[topic.items.length-1].lesson.serial} · 按顺序读</p></header><div class="lesson-grid">{topic.items.map((item,index)=><LessonCard post={item.post} lesson={item.lesson} order={index+1} />)}</div></section>) : <ArchiveList cat={cat} posts={posts} />}
-      {isCourse && unnumberedPosts.length > 0 && <section class="lesson-topic"><header class="lesson-topic-head"><h2 class="lesson-topic-title">更多课程归档</h2><p class="lesson-topic-meta">这些课程尚未标注编号，按日期浏览。</p></header><ArchiveList cat={cat} posts={unnumberedPosts} /></section>}
+      <header class="category-heading"><div><h1 class="page-title">{cat.name}</h1><p class="category-description">{cat.desc}</p></div><p class="archive-total"><strong>{posts.length}</strong><span>篇归档</span></p></header>
+      <ArchiveList cat={cat} posts={posts} />
     </div></div>
   </div>
 </Base>

@@ -46,12 +46,12 @@ const metaDate=post?(post.data.sample?'示例':ymd(post.data.date)):'';
       <div data-pagefind-ignore="all"><Breadcrumb items={[{label:'首页',href:withBase('/')},{label:cat.name,href:withBase(`/${cat.slug}/`)}]} /></div>
       <header class="article-heading"><p class="article-category"><a href={withBase(`/${cat.slug}/`)}>{cat.name}</a><span>{slotLabel(post.data.slot)}</span></p><h1 class="page-title" data-pagefind-meta="title">{post.data.title}</h1><p class="article-summary">{post.data.summary}</p><p class="article-meta"><span class="visually-hidden" data-pagefind-meta="category">{cat.name}</span><time datetime={ymd(post.data.date)} data-pagefind-meta="date">{metaDate}</time><span data-pagefind-meta="slot">{slotLabel(post.data.slot)}</span><span>来源：{post.data.source_bot}</span>{post.data.as_of&&<span>数据截至 {ymd(post.data.as_of)}</span>}</p>{lessonInfo&&<p class="article-lesson"><span class="lesson-serial">{lessonInfo.serial}</span><span>主题 {lessonInfo.topicIndex}/{lessonInfo.topicTotal} · {lessonInfo.topic} · {lessonInfo.section}</span></p>}</header>
       {headings.length>0&&<details class="article-mobile-toc" data-pagefind-ignore="all"><summary>本文目录 <span>{headings.length} 个部分</span></summary><nav aria-label="手机本文目录">{headings.map((heading)=><a href={`#${heading.slug}`} class:list={{'toc-subheading':heading.depth===3}}>{heading.text}</a>)}</nav></details>}
-      <div class="article-reading-layout"><div class="article-reading-body"><div class:list={['prose',{'is-course':isCourse}]}><Content /></div>
+      <div class="article-reading-layout"><div class="article-reading-body"><div class="prose"><Content /></div>
         {post.data.sources&&post.data.sources.length>0&&<section class="article-sources" aria-labelledby="article-sources-heading"><h2 id="article-sources-heading">参考来源</h2><ul>{post.data.sources.map((source)=><li>{/^https?:\/\//.test(source)?<a href={source}>{source}</a>:source}</li>)}</ul></section>}
         {post.data.tags&&post.data.tags.length>0&&<p class="article-tags" data-pagefind-ignore="all">标签：{post.data.tags.join('、')}</p>}
         <div class="article-reading-end" data-pagefind-ignore="all"><p>仅个人学习笔记，不构成投资建议</p><a href={withBase(`/${cat.slug}/`)}>返回{isCourse?'课程目录':cat.name} <span aria-hidden="true">→</span></a></div>
         {(prev||next)&&<nav class="article-neighbors" aria-label={isCourse?'前后课程':'同分类前后文章'} data-pagefind-ignore="all">{prev?<a href={postHref(cat.slug,prev.data.date,prev.data.slot)}><span>{isCourse?'上一课':'较早一篇'}</span><strong>{prev.data.title}</strong><time datetime={ymd(prev.data.date)}>{ymd(prev.data.date)}</time></a>:<div class="article-neighbor-empty">{isCourse?'你正在阅读本主题第一课':'已到最早归档'}</div>}{next?<a href={postHref(cat.slug,next.data.date,next.data.slot)}><span>{isCourse?'下一课':'较新一篇'}</span><strong>{next.data.title}</strong><time datetime={ymd(next.data.date)}>{ymd(next.data.date)}</time></a>:<div class="article-neighbor-empty">{isCourse?'已读到本主题最新一课':'这已是本分类最新文章'}</div>}</nav>}
-      </div>{headings.length>0&&<aside class="article-toc" data-pagefind-ignore="all" aria-label="阅读辅助"><div class="article-toc-inner"><h2>本文目录</h2><nav aria-label="本文目录">{headings.map((heading,index)=><a href={`#${heading.slug}`} aria-current={index===0?'location':undefined} class:list={{'toc-subheading':heading.depth===3}}>{heading.text}</a>)}</nav><a class="back-to-category" href={withBase(`/${cat.slug}/`)}>返回{isCourse?'课程目录':'分类'} <span aria-hidden="true">↖</span></a></div></aside>}</div>
+      </div></div>
     </article>
   </Base>
 ) : null}
@@ -64,13 +64,6 @@ const metaDate=post?(post.data.sample?'示例':ymd(post.data.date)):'';
     summary.textContent = '归档信息与数据口径';
     firstList.before(details);
     details.append(summary, firstList);
-  }
-  const toc=document.querySelector('.article-toc nav');
-  if(toc&&'IntersectionObserver' in window){
-    const links=[...toc.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')];
-    const sections=links.map((link)=>document.getElementById(decodeURIComponent(link.hash.slice(1)))).filter((section):section is HTMLElement=>section!==null);
-    const visible=new Set<string>();
-    const observer=new IntersectionObserver((entries)=>{entries.forEach((entry)=>{if(entry.isIntersecting)visible.add(entry.target.id);else visible.delete(entry.target.id);});const current=sections.find((section)=>visible.has(section.id));if(current)links.forEach((link)=>{if(decodeURIComponent(link.hash.slice(1))===current.id)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});},{rootMargin:'-8% 0px -55% 0px'});sections.forEach((section)=>observer.observe(section));
   }
   document.querySelectorAll<HTMLAnchorElement>('.article-mobile-toc nav a').forEach((link)=>link.addEventListener('click',()=>{const details=link.closest('details');if(details)details.open=false;}));
 </script>
