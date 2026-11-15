@@ -13,4 +13,8 @@ export default defineConfig({
   trailingSlash: 'ignore',
   build: { format: 'directory', inlineStylesheets: 'never' },
   devToolbar: { enabled: false },
+  // 正文里的流程块用浅色代码主题，跟全站白底一致（默认是深色，会突兀）
+  markdown: {
+    shikiConfig: { theme: 'github-light', wrap: true },
+  },
 });

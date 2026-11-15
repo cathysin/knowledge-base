@@ -70,6 +70,27 @@ front matter 必填：`title`、`date`、`category`（六个 slug 之一）、`s
 
 以后新增 cm-knowledge 文章，只要正文保留 `- 课程位置：主题 X/Y 名称 · 小节 · 编号` 这一行，就会自动进入课程视图并排好序。
 
+## 本轮（T015）：cm-knowledge 正文改成分块结构
+
+参考 `github.com/shuishui313/knowledge-base` 的写法：每篇正文固定拆成 6 个 `##` 区块，学员可以只读需要的那块。
+
+统一骨架（6 篇已全部改完）：
+
+1. `## 一句话结论` —— 加粗一句话，读完就能复述
+2. `## 它在解决什么问题` —— `**背景**` + `**如果没有它**`（列表）
+3. `## 怎么运作` —— 机制用代码块画流程，对比用表格
+4. `## 香港的例子` —— 落在本地市场，带来源
+5. `## 容易混淆的地方` —— `**A ≠ B**`：一句话点破
+6. `## 自测` —— 问题 + `<details><summary>参考答案</summary>` 折叠
+
+配套改动：
+
+- `astro.config.mjs`：`markdown.shikiConfig.theme` 设为 `github-light`（默认深色代码块和白底冲突）
+- `global.css`：`.prose h2` 20px / `.prose h3` 16px 建立两级层次；新增 `.prose pre`、`.prose details`、`.prose summary` 样式；`:root` 新增 `--c-fill: #FAFAFA`
+- 注意：`**标签**` 后面必须空一行，否则 markdown 会把标签和正文并成一段（已经踩过一次）
+
+以后写新课文，直接照抄这 6 个区块标题，内容换掉即可。
+
 ## 已知问题
 
 Firefox 不支持 `text-wrap: pretty`；Firefox 320px 下首页标题可能出现「Cathy's Know- / ledge Base」。

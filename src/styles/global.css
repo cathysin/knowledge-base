@@ -15,6 +15,7 @@
   --c-muted: #666666;
   --c-blue: #0052D9;      /* 只用于主按钮和 aria-current 当前链接 */
   --c-line: #E5E5E5;      /* 纯展示边框、分隔线 */
+  --c-fill: #FAFAFA;      /* 代码块、流程图底 */
   --c-ctrl: #8C8C8C;      /* 可交互控件边框，对白 3.36:1 */
   --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.04);
 
@@ -431,7 +432,35 @@ main { padding: 0 var(--s48); }
 .prose :first-child { margin-block-start: 0; }
 .prose p + p, .prose ul + p, .prose ol + p, .prose p + ul, .prose p + ol { margin-block-start: var(--s16); }
 .prose h2, .prose h3 { margin-block-start: var(--s32); margin-block-end: var(--s16); }
-.prose h3 { font-size: var(--fs-20); line-height: 1.4; }
+.prose h2 { font-size: var(--fs-20); line-height: 1.4; }
+.prose h3 { font-size: var(--fs-16); line-height: 1.4; }
+/* 分块用的流程块：等宽、浅底、可横向滚动 */
+.prose pre {
+  margin-block: var(--s16);
+  padding: var(--s16);
+  overflow-x: auto;
+  background: var(--c-fill);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  font-size: var(--fs-14);
+  line-height: 1.7;
+}
+.prose code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+/* 自测答案：默认收起，点开再看 */
+.prose details {
+  margin-block-start: var(--s16);
+  padding: var(--s16);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+}
+.prose summary {
+  display: flex;
+  align-items: center;
+  min-block-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.prose details > :not(summary) { margin-block-start: var(--s16); }
 /* 课程文章：正文首部的「日期／来源 bot／课程位置」与页头重复，不再重复显示 */
 .prose.is-course > ul:first-child { display: none; }
 .prose.is-course > :nth-child(2) { margin-block-start: var(--s24); }
