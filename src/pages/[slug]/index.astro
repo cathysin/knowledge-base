@@ -1,0 +1,58 @@
+---
+// 分类列表页 /<slug>/（方案 7.2）：按年分组、按日期倒序；当年列在本页，更早年份另页。
+import Base from '../../layouts/Base.astro';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import CatSwitch from '../../components/CatSwitch.astro';
+import { CATEGORIES, splitDigits } from '../../data/categories';
+import { postsInCategory, postHref, slotLabel, ymd, yearOf } from '../../lib/posts';
+import { withBase } from '../../lib/base';
+
+export function getStaticPaths() {
+  return CATEGORIES.map((cat) => ({ params: { slug: cat.slug }, props: { cat } }));
+}
+
+const { cat } = Astro.props;
+const posts = await postsInCategory(cat.slug);
+const years = [...new Set(posts.map((p) => yearOf(p.data.date)))].sort((a, b) => b - a);
+const currentYear = years[0];
+const currentPosts = posts.filter((p) => yearOf(p.data.date) === currentYear);
+const olderYears = years.filter((y) => y !== currentYear);
+---
+<Base topic={cat.name} description={cat.desc}>
+  <div class="page page-list" data-pagefind-body>
+    <Breadcrumb items={[
+      { label: '首页', href: withBase('/') },
+      { label: cat.name, href: withBase(`/${cat.slug}/`), current: true },
+    ]} />
+    <h1 class="page-title">
+      {splitDigits(cat.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}
+    </h1>
+    <p class="page-src">来源：{cat.sourceBot}</p>
+    <CatSwitch current={cat.slug} />
+    {currentPosts.length === 0 ? (
+      <p class="page-empty">这个分类还没有归档文章。 <a href={withBase("/")}>回到首页</a></p>
+    ) : (
+      <section class="year-block" aria-labelledby={`year-${currentYear}`}>
+        <h2 class="year-h" id={`year-${currentYear}`}>{currentYear}</h2>
+        <ol class="year-list">
+          {currentPosts.map((p) => (
+            <li>
+              <a href={postHref(cat.slug, p.data.date, p.data.slot)}>
+                <span class="post-when">{p.data.sample ? '示例' : ymd(p.data.date)} · {slotLabel(p.data.slot)}</span>
+                <span class="post-title">{p.data.title}</span>
+                <span class="post-summary">{p.data.summary}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+    )}
+    {olderYears.length > 0 && (
+      <p class="earlier-years">
+        更早年份：{olderYears.map((y, i) => (
+          <>{i > 0 ? '、' : ''}<a href={withBase(`/${cat.slug}/${y}/`)}>{y}</a></>
+        ))}
+      </p>
+    )}
+  </div>
+</Base>

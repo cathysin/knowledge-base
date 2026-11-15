@@ -1,0 +1,136 @@
+---
+// /<slug>/<YYYY-MM-DD-slot>/ 文章页（方案 7.3 / 6.2）
+// /<slug>/<year>/ 更早年份列表（方案 7.2）
+import { render, getCollection } from 'astro:content';
+import Base from '../../../layouts/Base.astro';
+import Breadcrumb from '../../../components/Breadcrumb.astro';
+import CatSwitch from '../../../components/CatSwitch.astro';
+import { CATEGORIES, splitDigits } from '../../../data/categories';
+import { postsInCategory, postHref, slotLabel, ymd, yearOf, comparePosts, assertBody, type Post } from '../../../lib/posts';
+import { withBase } from '../../../lib/base';
+
+export async function getStaticPaths() {
+  const paths: { params: { slug: string; entry: string }; props: Record<string, unknown> }[] = [];
+  const all = await getCollection('posts');
+  for (const cat of CATEGORIES) {
+    const posts = all.filter((p) => p.data.category === cat.slug).sort(comparePosts);
+    const years = [...new Set(posts.map((p) => yearOf(p.data.date)))];
+    for (const y of years) {
+      paths.push({ params: { slug: cat.slug, entry: String(y) }, props: { kind: 'year', year: y } });
+    }
+    for (const post of posts) {
+      assertBody(post);
+      paths.push({
+        params: { slug: cat.slug, entry: `${ymd(post.data.date)}-${post.data.slot}` },
+        props: { kind: 'article', post },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props { kind: 'year' | 'article'; year?: number; post?: Post }
+const { kind, year, post } = Astro.props;
+const slug = Astro.params.slug!;
+const cat = CATEGORIES.find((c) => c.slug === slug);
+if (!cat) throw new Error(`未知分类：${slug}`);
+
+const yearPosts = kind === 'year' && year
+  ? (await postsInCategory(cat.slug)).filter((p) => yearOf(p.data.date) === year)
+  : [];
+
+let Content: Awaited<ReturnType<typeof render>>['Content'] | undefined;
+let prev: Post | undefined;
+let next: Post | undefined;
+if (kind === 'article' && post) {
+  const siblings = (await getCollection('posts'))
+    .filter((p) => p.data.category === cat.slug)
+    .sort(comparePosts);
+  const i = siblings.findIndex((p) => p.id === post.id);
+  next = i > 0 ? siblings[i - 1] : undefined; // 更新的一篇
+  prev = i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : undefined; // 更早的一篇
+  Content = (await render(post)).Content;
+}
+
+const metaDate = post ? (post.data.sample ? '示例' : ymd(post.data.date)) : '';
+---
+{kind === 'year' && year ? (
+  <Base topic={`${cat.name} ${year}`} description={cat.desc}>
+    <div class="page page-list">
+      <Breadcrumb items={[
+        { label: '首页', href: withBase('/') },
+        { label: cat.name, href: withBase(`/${cat.slug}/`), current: true },
+      ]} />
+      <h1 class="page-title">
+        {splitDigits(cat.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}
+      </h1>
+      <p class="page-src">来源：{cat.sourceBot}</p>
+      <CatSwitch current={cat.slug} />
+      {yearPosts.length === 0 ? (
+        <p class="page-empty">这个分类还没有归档文章。 <a href={withBase("/")}>回到首页</a></p>
+      ) : (
+        <section class="year-block" aria-labelledby={`year-${year}`}>
+          <h2 class="year-h" id={`year-${year}`}>{year}</h2>
+          <ol class="year-list">
+            {yearPosts.map((p) => (
+              <li>
+                <a href={postHref(cat.slug, p.data.date, p.data.slot)}>
+                  <span class="post-when">{p.data.sample ? '示例' : ymd(p.data.date)} · {slotLabel(p.data.slot)}</span>
+                  <span class="post-title">{p.data.title}</span>
+                  <span class="post-summary">{p.data.summary}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      <p class="earlier-years"><a href={withBase(`/${cat.slug}/`)}>回到最新列表</a></p>
+    </div>
+  </Base>
+) : post && Content ? (
+  <Base topic={post.data.title} description={post.data.summary}>
+    <article class="page page-article" data-pagefind-body>
+      <Breadcrumb items={[
+        { label: '首页', href: withBase('/') },
+        { label: cat.name, href: withBase(`/${cat.slug}/`) },
+      ]} />
+      <h1 class="page-title" data-pagefind-meta="title">{post.data.title}</h1>
+      <p class="article-meta">
+        <span class="visually-hidden" data-pagefind-meta="category">{cat.name}</span>
+        <span data-pagefind-meta="date">{metaDate}</span>
+        {' · '}
+        <span data-pagefind-meta="slot">{slotLabel(post.data.slot)}</span>
+        {' · '}
+        {post.data.source_bot}
+        {post.data.as_of ? ` · 数据截至 ${ymd(post.data.as_of)}` : ''}
+      </p>
+      <p class="article-summary">{post.data.summary}</p>
+      <div class="prose">
+        <Content />
+      </div>
+      {post.data.sources && post.data.sources.length > 0 && (
+        <section class="article-sources" aria-labelledby="src-h">
+          <h2 id="src-h">来源</h2>
+          <ul>
+            {post.data.sources.map((s) => <li>{s}</li>)}
+          </ul>
+        </section>
+      )}
+      {post.data.tags && post.data.tags.length > 0 && (
+        <p class="article-tags">标签：{post.data.tags.join('、')}</p>
+      )}
+      {(prev || next) && (
+        <nav class="article-nav" aria-label="同分类前后文章">
+          <ul>
+            {prev && (
+              <li><a href={postHref(cat.slug, prev.data.date, prev.data.slot)}>上一篇：{prev.data.title}</a></li>
+            )}
+            {next && (
+              <li><a href={postHref(cat.slug, next.data.date, next.data.slot)}>下一篇：{next.data.title}</a></li>
+            )}
+          </ul>
+        </nav>
+      )}
+    </article>
+  </Base>
+) : null}

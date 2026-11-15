@@ -1,0 +1,43 @@
+---
+// 分类卡片（方案 7.1）：卡片本身不是链接；分类名、「查看全部」、每篇文章各自是链接，文章行整行可点。
+import type { Category } from '../data/categories';
+import { SLOT_LABEL, splitDigits } from '../data/categories';
+import { withBase } from '../lib/base';
+import { postHref } from '../lib/posts';
+
+export interface PostItem {
+  id: string;
+  title: string;
+  date: Date;
+  slot: string;
+  sample?: boolean;
+}
+interface Props { cat: Category; posts: PostItem[] }
+const { cat, posts } = Astro.props;
+
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+// 示例文章不显示假日期，元信息写「示例 · 时点」；真实文章写「YYYY-MM-DD · 时点」
+const meta = (p: PostItem) => `${p.sample ? '示例' : ymd(p.date)} · ${SLOT_LABEL[p.slot] ?? p.slot}`;
+---
+<article class:list={['cat-card', { wide: cat.wide }]} aria-labelledby={`cat-${cat.slug}`}>
+  <div class="cat-head">
+    <h3 id={`cat-${cat.slug}`}><a href={withBase(`/${cat.slug}/`)}><span>{splitDigits(cat.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}</span></a></h3>
+    <p class="cat-desc">{splitDigits(cat.desc).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}</p>
+    <p class="cat-src">来源：{cat.sourceBot}</p>
+    <a class="more" href={withBase(`/${cat.slug}/`)}>查看全部<span class="visually-hidden">{cat.name}</span> <span aria-hidden="true">›</span></a>
+  </div>
+  {posts.length > 0 ? (
+    <ol class="post-list" aria-label={`${cat.name}最新文章`}>
+      {posts.map((p) => (
+        <li>
+          <a href={postHref(cat.slug, p.date, p.slot)}>
+            <span class="post-meta">{meta(p)}</span>
+            <span class="post-title">{p.title}</span>
+          </a>
+        </li>
+      ))}
+    </ol>
+  ) : (
+    <p class="cat-none">这个分类还没有归档文章</p>
+  )}
+</article>

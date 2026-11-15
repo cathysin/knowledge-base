@@ -1,0 +1,11 @@
+---
+// 手机「快速跳到分类」（方案 7.0）：只在 ≤40em 显示，无障碍名称和可见小标题一致。
+import { CATEGORIES, splitDigits } from '../data/categories';
+import { withBase } from '../lib/base';
+---
+<nav class="quick" aria-labelledby="quick-label">
+  <p class="quick-label" id="quick-label">快速跳到分类</p>
+  <ul>
+    {CATEGORIES.map((c) => <li><a href={withBase(`/${c.slug}/`)}><span>{splitDigits(c.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}</span></a></li>)}
+  </ul>
+</nav>

@@ -1,0 +1,17 @@
+---
+import { CATEGORIES, splitDigits } from '../data/categories';
+import { withBase } from '../lib/base';
+interface Props { current: string }
+const { current } = Astro.props;
+---
+<nav class="cat-switch" aria-label="分类">
+  <ul>
+    {CATEGORIES.map((c) => (
+      <li>
+        <a href={withBase(`/${c.slug}/`)} aria-current={c.slug === current ? 'page' : undefined}>
+          <span>{splitDigits(c.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>

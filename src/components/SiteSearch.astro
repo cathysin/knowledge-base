@@ -1,0 +1,16 @@
+---
+// 搜索框（方案 7.0 / 7.1 / 7.4）：<search><form> 原生 GET 提交到 /search/?q=。
+// 中文输入法回车选字不会误提交。首页不加载搜索脚本；结果页带入当前关键词。
+import { withBase } from '../lib/base';
+interface Props { value?: string }
+const { value = '' } = Astro.props;
+---
+<search class="site-search">
+  <form action={withBase('/search/')} method="get">
+    <label for="q">搜索全部文章</label>
+    <div class="search-field">
+      <input id="q" name="q" type="search" enterkeyhint="search" autocomplete="off" value={value} />
+      <button class="btn-primary" type="submit">搜索</button>
+    </div>
+  </form>
+</search>

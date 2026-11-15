@@ -1,0 +1,189 @@
+---
+// 搜索结果页 /search/?q=（方案 7.4）。静态壳 + Pagefind JS API，不用自带默认样式。
+import Base from '../../layouts/Base.astro';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import SiteSearch from '../../components/SiteSearch.astro';
+import { CATEGORIES, splitDigits } from '../../data/categories';
+import { withBase } from '../../lib/base';
+---
+<Base topic="搜索" description="搜索全部归档文章">
+  <div class="page page-search" data-pagefind-ignore="all">
+    <Breadcrumb items={[
+      { label: '首页', href: withBase('/') },
+      { label: '搜索' },
+    ]} />
+    <h1 class="page-title">搜索</h1>
+    <SiteSearch />
+    <form class="filters" id="filters" aria-label="按分类筛选">
+      <label><input type="checkbox" name="cat" value="all" checked /> 全部</label>
+      {CATEGORIES.map((c) => (
+        <label>
+          <input type="checkbox" name="cat" value={c.slug} data-name={c.name} />
+          {splitDigits(c.name).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}
+        </label>
+      ))}
+    </form>
+    <p class="result-count" id="result-count" aria-live="polite"></p>
+    <div id="search-panel">
+      <div class="search-loading" id="search-loading" hidden>
+        <progress></progress>
+        <p>正在载入搜索索引</p>
+      </div>
+      <p class="page-empty" id="search-hint">输入关键词搜索全部归档文章</p>
+      <div class="search-error" id="search-error" hidden>
+        <p role="alert">搜索暂时不能用，请稍后刷新再试。</p>
+        <p><a href={withBase('/')}>回到首页</a></p>
+      </div>
+      <p class="page-empty" id="search-none" hidden></p>
+      <ol class="search-list" id="search-list"></ol>
+    </div>
+  </div>
+</Base>
+
+<script is:inline type="module">
+  const BASE = (() => {
+    const raw = document.documentElement.dataset.base || '/';
+    return raw.endsWith('/') ? raw : raw + '/';
+  })();
+  function withBase(path) {
+    if (!path || path === '/') return BASE;
+    if (/^(https?:|mailto:)/i.test(path)) return path;
+    if (path.startsWith(BASE)) return path;
+    if (path.startsWith('#') || path.startsWith('/#')) {
+      const hash = path.startsWith('/#') ? path.slice(1) : path;
+      return BASE + hash;
+    }
+    return BASE + (path.startsWith('/') ? path.slice(1) : path);
+  }
+
+  const countEl = document.getElementById('result-count');
+  const loadingEl = document.getElementById('search-loading');
+  const hintEl = document.getElementById('search-hint');
+  const errorEl = document.getElementById('search-error');
+  const noneEl = document.getElementById('search-none');
+  const listEl = document.getElementById('search-list');
+  const filters = document.getElementById('filters');
+  const input = document.getElementById('q');
+
+  const params = new URLSearchParams(location.search);
+  const q = (params.get('q') ?? '').trim();
+  if (input && !input.value) input.value = q;
+
+  function selectedCats() {
+    const boxes = [...filters.querySelectorAll('input[name="cat"]')];
+    const all = boxes.find((b) => b.value === 'all');
+    const rest = boxes.filter((b) => b.value !== 'all');
+    if (all?.checked || rest.every((b) => !b.checked) || rest.every((b) => b.checked)) return [];
+    return rest.filter((b) => b.checked).map((b) => b.dataset.name || b.value);
+  }
+
+  function show(el, on) { if (el) el.hidden = !on; }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function formatExcerpt(html) {
+    return String(html || '').split(/(<\/?mark>)/i).map((p) => /^<\/?mark>$/i.test(p) ? p.toLowerCase() : escapeHtml(p)).join('');
+  }
+
+  function cleanTitle(raw) {
+    const t = (raw || '').trim();
+    return t.replace(/\s*\|\s*Cathy's Knowledge Base\s*$/, '').trim() || t;
+  }
+
+  let allResults = [];
+
+  function render() {
+    const cats = selectedCats();
+    const rows = cats.length ? allResults.filter((r) => cats.includes(r.category)) : allResults;
+    listEl.replaceChildren();
+    noneEl.hidden = true;
+    if (!q) { countEl.textContent = ''; return; }
+    countEl.textContent = '找到 ' + rows.length + ' 篇';
+    if (rows.length === 0) {
+      noneEl.hidden = false;
+      noneEl.replaceChildren();
+      const p = document.createElement('p');
+      p.textContent = '没有找到包含“' + q + '”的文章';
+      noneEl.append(p);
+      const sug = document.createElement('p');
+      sug.textContent = '换个词，或者从分类进入：';
+      noneEl.append(sug);
+      const ul = document.createElement('ul');
+      ul.className = 'search-suggest';
+      for (const box of filters.querySelectorAll('input[name="cat"][data-name]')) {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = withBase('/' + box.value + '/');
+        a.textContent = box.dataset.name || box.value;
+        li.append(a);
+        ul.append(li);
+      }
+      noneEl.append(ul);
+      return;
+    }
+    for (const r of rows) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = withBase(r.url);
+      a.className = 'search-hit-title';
+      a.textContent = r.title;
+      const meta = document.createElement('p');
+      meta.className = 'search-hit-meta';
+      meta.textContent = [r.category, r.date, r.slot].filter(Boolean).join(' · ');
+      const ex = document.createElement('p');
+      ex.className = 'search-hit-excerpt';
+      ex.innerHTML = formatExcerpt(r.excerpt);
+      li.append(a, meta, ex);
+      listEl.append(li);
+    }
+  }
+
+  filters.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.name !== 'cat') return;
+    const boxes = [...filters.querySelectorAll('input[name="cat"]')];
+    const all = boxes.find((b) => b.value === 'all');
+    const rest = boxes.filter((b) => b.value !== 'all');
+    if (t.value === 'all' && t.checked) rest.forEach((b) => { b.checked = false; });
+    if (t.value !== 'all' && t.checked) all.checked = false;
+    if (rest.every((b) => !b.checked)) all.checked = true;
+    render();
+  });
+
+  if (!q) {
+    show(hintEl, true);
+    show(loadingEl, false);
+    show(errorEl, false);
+  } else {
+    show(hintEl, false);
+    show(loadingEl, true);
+    show(errorEl, false);
+    try {
+      const pf = await import(withBase('/pagefind/pagefind.js'));
+      await pf.init();
+      const res = await pf.search(q);
+      allResults = [];
+      for (const r of res.results) {
+        const d = await r.data();
+        allResults.push({
+          url: withBase(d.url),
+          title: cleanTitle(d.meta?.title || ''),
+          category: d.meta?.category || '',
+          date: d.meta?.date || '',
+          slot: d.meta?.slot || '',
+          excerpt: d.excerpt || '',
+        });
+      }
+      show(loadingEl, false);
+      render();
+    } catch (err) {
+      console.error(err);
+      show(loadingEl, false);
+      show(hintEl, false);
+      show(errorEl, true);
+      countEl.textContent = '';
+    }
+  }
+</script>

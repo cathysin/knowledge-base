@@ -1,0 +1,20 @@
+{
+  "name": "t005-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cathy's Knowledge Base 静态站（T005-C：首页、分类、文章、搜索、404）",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "build": "astro build && node scripts/enhance-tables.mjs dist && pagefind --site dist && node scripts/verify-dist.mjs dist",
+    "preview": "astro preview --host 127.0.0.1 --port 4321",
+    "selfcheck": "node scripts/selfcheck.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.4.12",
+    "pagefind": "^1.6.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1"
+  }
+}

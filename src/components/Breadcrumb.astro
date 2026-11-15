@@ -1,0 +1,26 @@
+---
+import { splitDigits } from '../data/categories';
+
+export interface Crumb {
+  label: string;
+  href?: string;
+  current?: boolean;
+}
+interface Props { items: Crumb[] }
+const { items } = Astro.props;
+---
+<nav class="crumbs" aria-label="面包屑">
+  <ol>
+    {items.map((item) => (
+      <li>
+        {item.href ? (
+          <a href={item.href} aria-current={item.current ? 'page' : undefined}>
+            {splitDigits(item.label).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}
+          </a>
+        ) : (
+          <span>{splitDigits(item.label).map((p) => p.isNum ? <span class="num">{p.text}</span> : p.text)}</span>
+        )}
+      </li>
+    ))}
+  </ol>
+</nav>

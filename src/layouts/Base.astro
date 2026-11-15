@@ -1,0 +1,46 @@
+---
+// 全站外壳：页面骨架（v4 11.1）、顶栏、页脚免责声明（每页固定，方案第 9 节第 6 条）。
+import '../styles/global.css';
+import { SITE_NAME, DISCLAIMER, REPO_URL } from '../data/categories';
+import { withBase } from '../lib/base';
+
+interface Props {
+  /** 页面主题，<title> 写成「页面主题 | Cathy's Knowledge Base」 */
+  topic: string;
+  description?: string;
+  /** 顶栏「分类」链接（1280 显示，390/320 隐藏）。默认指向首页分类区。 */
+  catsHref?: string;
+}
+const { topic, description = '各 bot 定时推送的归档，按分类和日期整理', catsHref = withBase('/#cats') } = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="zh-CN" data-base={import.meta.env.BASE_URL}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" href="data:," />
+    <title>{`${topic} | ${SITE_NAME}`}</title>
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+    <header class="site-header" data-pagefind-ignore="all">
+      <a class="brand" href={withBase('/')} lang="en">{SITE_NAME}</a>
+      <nav class="site-nav" aria-label="站点">
+        <ul>
+          <li class="nav-cats"><a href={catsHref}>分类</a></li>
+          <li><a href={REPO_URL}>源码仓库</a></li>
+        </ul>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="site-footer" data-pagefind-ignore="all">
+      <p>{DISCLAIMER}</p>
+      <p><a href={REPO_URL}>源码仓库</a> · 按分类与日期归档</p>
+    </footer>
+  </body>
+</html>

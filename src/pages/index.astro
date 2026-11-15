@@ -1,0 +1,45 @@
+---
+// 首页（T005-C）。版式：方向 A「留白大」，字号版 2，规范 v4。
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import SiteSearch from '../components/SiteSearch.astro';
+import QuickNav from '../components/QuickNav.astro';
+import CategoryCard from '../components/CategoryCard.astro';
+import { CATEGORIES, SITE_NAME } from '../data/categories';
+
+const SLOT_ORDER = ['post', 'mid-2', 'mid-1', 'mid', 'pre', 'daily'];
+
+// 自检用：构建时设 KB_EMPTY=all 或 KB_EMPTY=cm-knowledge,hk-ipo，可以触发空态截图；正式构建不设。
+const emptyEnv = (process.env.KB_EMPTY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+const isEmpty = (slug: string) => emptyEnv.includes('all') || emptyEnv.includes(slug);
+
+const all = await getCollection('posts');
+const byCat = CATEGORIES.map((cat) => {
+  const posts = isEmpty(cat.slug)
+    ? []
+    : all
+        .filter((e) => e.data.category === cat.slug)
+        .sort((a, b) =>
+          b.data.date.getTime() - a.data.date.getTime() ||
+          SLOT_ORDER.indexOf(a.data.slot) - SLOT_ORDER.indexOf(b.data.slot))
+        .slice(0, 3)
+        .map((e) => ({ id: e.id, title: e.data.title, date: e.data.date, slot: e.data.slot, sample: e.data.sample }));
+  return { cat, posts };
+});
+const allEmpty = byCat.every((x) => x.posts.length === 0);
+---
+<Base topic="首页" catsHref="#cats">
+  <section class="hero" aria-labelledby="page-title">
+    <h1 id="page-title" lang="en">Cathy's Know&shy;ledge Base</h1>
+    <p class="sub">各 bot 定时<wbr />推送的<wbr />归档，<wbr />按分类<wbr />和日期<wbr />整理</p>
+    <SiteSearch />
+    <QuickNav />
+  </section>
+  <section class="cats" id="cats" aria-labelledby="cats-h">
+    <h2 id="cats-h">分类</h2>
+    {allEmpty && <p class="cats-empty">还没有归档内容，第一批推送入库后会显示在这里</p>}
+    <div class="cat-grid">
+      {byCat.map(({ cat, posts }) => <CategoryCard cat={cat} posts={posts} />)}
+    </div>
+  </section>
+</Base>
