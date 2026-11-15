@@ -58,7 +58,7 @@ const metaDate=post?(post.data.sample?'示例':ymd(post.data.date)):'';
 <script>
   const prose = document.querySelector('.prose');
   const firstList = prose?.firstElementChild;
-  if (firstList?.tagName === 'UL' && /日期|来源 bot|课程位置|口径|标题/.test(firstList.textContent ?? '')) {
+  if (firstList?.tagName === 'UL' && /日期|来源 bot|课程位置|口径|标题|覆盖/.test(firstList.textContent ?? '')) {
     const details = document.createElement('details');
     const summary = document.createElement('summary');
     summary.textContent = '归档信息与数据口径';

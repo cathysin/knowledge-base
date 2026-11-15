@@ -8,7 +8,6 @@
     <button type="button" data-flow-pause aria-pressed="true">暂停动效</button>
     <button type="button" data-flow-reset>复位光场</button>
   </div>
-  <p class="flow-hint">移动鼠标扰动光场 · 选择主题改变形态</p>
 </section>
 
 <script>
@@ -36,7 +35,7 @@
 
   .flow-mount {
     position: absolute;
-    inset: 0 0 26px;
+    inset: 0;
   }
 
   .flow-mount :global(canvas) {
@@ -105,16 +104,6 @@
     background: #263b54;
   }
 
-  .flow-hint {
-    position: absolute;
-    inset-block-end: 0;
-    inset-inline: 0;
-    text-align: center;
-    font-size: 0.75rem;
-    line-height: 1.6;
-    color: var(--flow-muted);
-  }
-
   @media (max-width: 640px) {
     .flow-field {
       height: 300px;
@@ -125,8 +114,5 @@
       padding-inline: 10px;
     }
 
-    .flow-hint {
-      font-size: 0.75rem;
-    }
   }
 </style>

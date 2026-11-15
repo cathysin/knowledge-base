@@ -24,6 +24,9 @@ for (const f of files) {
     const heading = [...html.slice(0, offset).matchAll(/<h[23]\b[^>]*>([\s\S]*?)<\/h[23]>/gi)].at(-1)?.[1]?.replace(/<[^>]+>/g, '').trim();
     const caption = (heading || '文章数据表').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const labels = [...table.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)].map((m) => m[1].replace(/<[^>]+>/g, '').trim());
+    const columns = labels.length || [...(table.match(/<tr\b[\s\S]*?<\/tr>/i)?.[0] ?? '').matchAll(/<t[dh]\b/gi)].length;
+    const size = columns >= 8 ? 'wide' : columns >= 6 ? 'medium' : columns >= 4 ? 'regular' : 'compact';
+    const wrapper = `<div class="table-wrap" data-table-size="${size}" data-columns="${columns}" role="region" tabindex="0"`;
     let out = table;
     if (!/<caption\b/i.test(out)) {
       out = out.replace(/<table\b[^>]*>/i, (open) => `${open}<caption class="visually-hidden" id="${capId}">${caption}</caption>`);
@@ -31,7 +34,7 @@ for (const f of files) {
       out = out.replace(/<caption\b/i, `<caption id="${capId}"`);
     } else {
       const existing = out.match(/<caption\b[^>]*id="([^"]+)"/i);
-      if (existing) return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="${existing[1]}">${out}</div>`;
+      if (existing) return `${wrapper} aria-labelledby="${existing[1]}">${out}</div>`;
     }
     if (labels.length) {
       let i = 0;
@@ -42,7 +45,7 @@ for (const f of files) {
         return `<td data-label="${label.replace(/"/g, '&quot;')}"${attrs}>`;
       });
     }
-    return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="${capId}">${out}</div>`;
+    return `${wrapper} aria-labelledby="${capId}">${out}</div>`;
   });
   if (next !== html) {
     writeFileSync(f, next);
