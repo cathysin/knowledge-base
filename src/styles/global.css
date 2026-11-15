@@ -28,7 +28,7 @@ button,input,select,textarea{font:inherit}
 .empty-state p{margin-top:12px;color:var(--c-muted);font-size:.9375rem}
 ::selection{background:#dceaff;color:#101c30}
 
-:root{color-scheme:light;--np-bg:#fff;--np-ink:#17191d;--np-muted:#646b75;--np-line:#e3e6eb;--np-soft:#f5f6f8;--np-blue:#0059d6;font-family:Inter,-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:var(--np-ink);line-height:1.6}
+:root{color-scheme:light;--np-bg:#fff;--np-ink:#17191d;--np-muted:#646b75;--np-line:#e3e6eb;--np-soft:#f5f6f8;--np-blue:#0059d6;font-family:var(--font);color:var(--np-ink);line-height:1.6}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 button,input,select{font:inherit}
