@@ -6,8 +6,8 @@ import { defineConfig } from 'astro/config';
 // 表格的窄屏处理放在 scripts/enhance-tables.mjs（构建后改 HTML）：
 // Astro 7 默认不再走 markdown.rehypePlugins，不加额外 Markdown 套件。
 export default defineConfig({
-  site: 'https://cathysin.github.io',
-  base: '/knowledge-base/',
+  site: process.env.VERCEL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL}` : 'https://cathysin.github.io',
+  base: process.env.VERCEL ? '/' : '/knowledge-base/',
   output: 'static',
   prefetch: false,
   trailingSlash: 'ignore',

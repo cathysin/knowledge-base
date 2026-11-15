@@ -1,3 +1,9 @@
+# Vercel 部署（2026-11-16）
+
+- GitHub main 同步后接入 Vercel，构建 npm run build，输出 dist。
+- Vercel 环境使用根路径 /，GitHub Pages 继续使用 /knowledge-base/。
+- .vercel 本地连接信息不提交。
+
 # 交接说明（T013）
 
 ## T018：正式文案与全站正文排版统一（2026-11-15）
