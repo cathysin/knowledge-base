@@ -3,6 +3,7 @@
 // 幂等：重复跑只覆盖同名输出文件；只写 content/ 目录，不删任何文件。
 // 不写 compliance_checked（这些推送没过合规审查）；不在正文末尾另加免责声明（页脚已有）。
 // 发现疑似敏感信息（邮箱、密钥/令牌、账户号码）的文件不导入，脚本以非 0 退出。
+// 正文里含本机路径（/workspace/ 等）的句子整句删掉；删完还残留路径的文件不导入。
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, relative, sep } from 'node:path';
 
@@ -37,6 +38,22 @@ const SENSITIVE = [
   [/(?:客户|客戶)\s*[:：]/, '客户名字段'],
   [/https?:\/\/(?:[^\s/)]*[./])?(?:intranet|internal|corp|localhost)(?:[.:/]|$)|https?:\/\/[^\s/)]*\.(?:local|lan|corp|internal)(?:[:/)\s]|$)/i, '内部网址'],
 ];
+
+// 本机路径：/workspace/、/home/、/cursor/ 等开头。
+const LOCAL_PATH = /(?:^|[\s`'"(（：:，,])\/(?:workspace|home|cursor|tmp|root|Users|mnt|opt)\//;
+
+/** 删掉含本机路径的句子（代码块外）；整行删空就去掉这一行。 */
+function stripLocalPaths(body) {
+  let inFence = false;
+  const out = [];
+  for (const line of body.split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; out.push(line); continue; }
+    if (inFence || !LOCAL_PATH.test(line)) { out.push(line); continue; }
+    const kept = (line.match(/[^。！？!?]+[。！？!?]*/g) ?? []).filter((s) => !LOCAL_PATH.test(s)).join('').trimEnd();
+    if (kept.trim()) out.push(kept);
+  }
+  return out.join('\n');
+}
 
 function parseFrontMatter(raw) {
   const m = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
@@ -130,7 +147,7 @@ for (const bot of readdirSync(INBOX).sort()) {
     if (hits.length) { skipped.push({ src, reason: hits.join('、') }); hadError = true; continue; }
 
     const { data, body: body0 } = parseFrontMatter(raw);
-    let body = body0;
+    let body = stripLocalPaths(body0);
     let title = data.title;
     if (!title) {
       const h = body.match(/^#\s+(.+?)\s*#*\s*$/m);
@@ -149,6 +166,7 @@ for (const bot of readdirSync(INBOX).sort()) {
     const summary = (data.summary && data.summary.length <= 120 ? data.summary : makeSummary(body));
     if (!summary) errs.push('提不出摘要');
     if (!body.trim()) errs.push('正文为空');
+    if (LOCAL_PATH.test(body)) errs.push('删句后仍含本机路径');
     if (errs.length) { skipped.push({ src, reason: errs.join('、') }); hadError = true; continue; }
 
     const outPath = join(CONTENT, category, date.slice(0, 4), `${date}-${slot}.md`);
