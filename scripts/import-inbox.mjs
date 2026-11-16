@@ -1,5 +1,8 @@
 // T012-B / T035：把 knowledge-inbox/<bot>/<YYYY-MM-DD>.md
 // 或 <YYYY-MM-DD-HHMM>.md 导入 content/<slug>/<YYYY>/<YYYY-MM-DD>-<slot>.md。
+// 标题含「盘中」且文件名带 HHMM 时，写成 <YYYY-MM-DD>-<HHMM>.md，不占用 daily。
+// 目标 daily/pre/post 已存在、且 source/origin 指向另一份收件箱文件时，
+// 带 HHMM 的新文件改写到 <YYYY-MM-DD>-<HHMM>.md。同一 source 仍原地覆盖。
 // 用法：node scripts/import-inbox.mjs [收件箱目录]（默认 ../knowledge-inbox）
 // 幂等：重复跑只覆盖同名输出文件；只写 content/ 目录，不删任何文件，不改收件箱。
 // 不写 compliance_checked（这些推送没过合规审查）；不在正文末尾另加免责声明（页脚已有）。
@@ -50,6 +53,12 @@ export function fileDateOf(filename) {
   const named = String(filename).match(/^(\d{4}-\d{2}-\d{2})(?:-\d{4})?\.md$/);
   if (named) return named[1];
   return (String(filename).match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
+}
+
+/** YYYY-MM-DD-HHMM.md → HHMM；没有钟点则空字符串。 */
+export function fileClockOf(filename) {
+  const named = String(filename).match(/^\d{4}-\d{2}-\d{2}-(\d{4})\.md$/);
+  return named ? named[1] : '';
 }
 
 /** 删掉含本机路径的句子（代码块外）；整行删空就去掉这一行。 */
@@ -288,6 +297,48 @@ function detectSlot(title, given) {
   return 'daily';
 }
 
+function unquoteYaml(value) {
+  const text = String(value ?? '').trim();
+  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+    return text.slice(1, -1);
+  }
+  return text;
+}
+
+/** 已写入页面的收件箱来源。没有文件返回 null；没有 source/origin 返回空字符串。 */
+export function readTrackedSource(filePath) {
+  if (!existsSync(filePath)) return null;
+  const raw = readFileSync(filePath, 'utf8');
+  const fm = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fm) return '';
+  let source = '';
+  let origin = '';
+  for (const line of fm[1].split(/\r?\n/)) {
+    const kv = line.match(/^(source|origin)\s*[:：]\s*(.*)$/);
+    if (!kv) continue;
+    if (kv[1] === 'source') source = unquoteYaml(kv[2]);
+    else origin = unquoteYaml(kv[2]);
+  }
+  return source || origin;
+}
+
+/**
+ * 输出文件名后缀。开盘前/盘后仍用 detectSlot 的结果。
+ * 盘中标题且文件名带 HHMM 时用 HHMM。
+ * daily/pre/post 已有另一份收件箱来源时，带 HHMM 的新文件也改用 HHMM。
+ * 同一 source（或旧文件还没有 source）仍返回原 slot，原地更新。
+ */
+export function chooseOutputSlot(detected, { title, clock, existingSource, sourceRel }) {
+  const named = detected === 'daily' || detected === 'pre' || detected === 'post';
+  if (/盘中|盤中/.test(title || '') && clock && detected !== 'pre' && detected !== 'post') return clock;
+  if (clock && named && existingSource && existingSource !== sourceRel) return clock;
+  return detected;
+}
+
+function yamlSlot(slot) {
+  return /^\d{4}$/.test(slot) ? JSON.stringify(slot) : slot;
+}
+
 /** 去掉和页面标题重复的首个 H1；其余 H1 降成 H2（页面模板已渲染 <h1>，每页只能一个）。 */
 function fixHeadings(body, title) {
   const lines = body.split(/\r?\n/);
@@ -354,7 +405,16 @@ function main() {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push('没有日期');
       if (!category || !Object.values(BOT_TO_SLUG).includes(category)) errs.push(`分类未知（${bot}）`);
       body = fixHeadings(body, title);
-      const slot = detectSlot(title, data.slot);
+      const detected = detectSlot(title, data.slot);
+      const sourceRel = relative(INBOX, src).split(sep).join('/');
+      const clock = fileClockOf(f);
+      const slotTarget = join(CONTENT, category, date.slice(0, 4), `${date}-${detected}.md`);
+      const slot = chooseOutputSlot(detected, {
+        title,
+        clock,
+        existingSource: readTrackedSource(slotTarget),
+        sourceRel,
+      });
       const summary = cleanedSummary(data.summary) || makeSummary(body);
       if (!summary) errs.push('提不出摘要');
       if (!body.trim()) errs.push('正文为空');
@@ -370,7 +430,8 @@ function main() {
         `date: ${date}`,
         `category: ${category}`,
         `source_bot: ${yamlStr(source_bot)}`,
-        `slot: ${slot}`,
+        `source: ${yamlStr(sourceRel)}`,
+        `slot: ${yamlSlot(slot)}`,
         `summary: ${yamlStr(summary)}`,
         '---',
         '',

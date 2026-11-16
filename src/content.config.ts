@@ -11,7 +11,11 @@ const posts = defineCollection({
     date: z.coerce.date(),
     category: z.enum(SLUG_ENUM),
     source_bot: z.string().min(1),
-    slot: z.enum(['pre', 'mid', 'mid-1', 'mid-2', 'post', 'daily']),
+    // 盘中简报用收件箱文件名里的 HHMM 作独立页面（如 1400），避免覆盖同日 daily。
+    slot: z.preprocess(
+      (value) => (typeof value === 'number' && Number.isInteger(value) ? String(value).padStart(4, '0') : value),
+      z.string().regex(/^(?:pre|mid|mid-1|mid-2|post|daily|\d{4})$/),
+    ),
     push_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
     markets: z.array(z.enum(['港股', '美股', '全球'])).optional(),
     tags: z.array(z.string()).max(5).optional(),
