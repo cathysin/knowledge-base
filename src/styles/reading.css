@@ -131,3 +131,40 @@
 @media(max-width:48em){.page{width:calc(100% - 48px)}.category-layout{grid-template-columns:1fr;gap:0}.category-rail{display:none}.mobile-categories{display:block;border-bottom:1px solid var(--c-line);padding-bottom:16px;margin-bottom:28px}.mobile-categories summary{display:flex;justify-content:space-between;gap:16px;min-height:44px;align-items:center;font-size:.875rem;cursor:pointer}.mobile-categories summary>span{color:var(--c-muted);font-size:.75rem}.mobile-categories nav{display:flex;flex-direction:column;padding-top:12px}.mobile-categories nav a{min-height:44px;padding-block:10px;font-size:.875rem;text-decoration:none}.article-reading-layout{grid-template-columns:1fr;padding-top:28px}.article-toc{display:none}.article-mobile-toc{display:block;border-bottom:1px solid var(--c-line);padding-block:14px}.article-mobile-toc summary{display:flex;justify-content:space-between;gap:20px;align-items:center;min-height:44px;font-size:.875rem;cursor:pointer}.article-mobile-toc summary>span{font-size:.75rem;color:var(--c-muted)}.article-mobile-toc nav{display:flex;flex-direction:column;padding-block:12px}.article-mobile-toc nav a{min-height:44px;padding-block:10px;font-size:.875rem;line-height:1.7;color:var(--c-muted);text-decoration:none}.article-mobile-toc nav .toc-subheading{padding-left:16px}.prose{max-width:100%}.page .crumbs{margin-bottom:26px}.page .crumbs a,.page .crumbs span{min-height:44px}.lesson-grid{gap:16px}}
 @media(max-width:34em){.page{width:calc(100% - 40px);padding-block:20px 42px}.page-title,.category-heading .page-title{font-size:2rem;line-height:1.3}.category-description{font-size:.875rem;margin-top:14px}.page .crumbs{font-size:.75rem;margin-bottom:22px}.category-heading{gap:18px;align-items:start;padding-bottom:24px}.archive-total strong{font-size:1.625rem}.archive-toolbar{align-items:start;flex-direction:column;gap:14px}.archive-filters{gap:12px}.archive-filters select{min-height:44px}.archive-list li>a{gap:8px 12px;padding-block:22px}.archive-list h3{font-size:1.125rem}.archive-meta{gap:4px 12px}.article-heading{padding-bottom:26px}.article-summary{font-size:1.0625rem;line-height:1.9;margin-top:20px}.article-meta{gap:8px 14px;margin-top:20px}.article-category{gap:14px;margin-bottom:16px}.prose{font-size:1rem;line-height:1.95}.prose h1,.prose h2{font-size:1.4375rem;margin-top:38px}.prose h3{font-size:1.25rem}.prose blockquote{padding:20px}.prose summary{min-height:44px}.article-neighbors{gap:20px;grid-template-columns:1fr}.article-neighbors>*+*{border-top:1px solid var(--c-line);padding-top:20px}.article-neighbors strong{font-size:.875rem}.archive-empty{padding-block:40px}.archive-empty h2{font-size:1.375rem}.archive-empty a,.archive-empty button,.back-to-category{min-height:44px}.lesson-grid{grid-template-columns:1fr}.lesson-topic-title{font-size:1.5rem}.lesson-card{padding:24px}.lesson-title{font-size:1.125rem}.lesson-topic+.lesson-topic{margin-top:36px}}
 @media(prefers-reduced-motion:no-preference){.archive-list h3,.category-rail nav a,.lesson-card{transition:color .18s,border-color .18s}.archive-arrow{transition:transform .22s cubic-bezier(.16,1,.3,1),color .18s}.archive-list a:hover .archive-arrow{transform:translate(2px,-2px)}}
+
+/* Editorial rhythm shared by every archive and article. */
+.category-layout{grid-template-columns:190px minmax(0,1fr);gap:64px}
+.category-rail{padding-right:24px}
+.category-rail h2{font-size:.8125rem;margin-bottom:20px}
+.category-rail nav a{min-height:44px;font-size:.9375rem}
+.category-heading{align-items:end;padding-bottom:36px}
+.category-heading .page-title{font-size:2.875rem;line-height:1.2}
+.category-description{margin-top:14px;font-size:1.0625rem}
+.archive-total{gap:8px}
+.archive-toolbar{padding:16px 20px;background:var(--c-fill);border:0;border-radius:8px;font-size:.8125rem}
+.archive-filters select{background:var(--c-bg);font-size:.8125rem;min-height:40px}
+.archive-month{margin-top:40px}
+.archive-month>h2{font-size:.875rem;font-weight:600;color:var(--c-ink);margin-bottom:14px}
+.archive-list li>a{grid-template-columns:120px minmax(0,1fr) 20px;column-gap:24px;row-gap:9px;padding-block:28px}
+.archive-meta{grid-column:1;grid-row:1 / span 2;align-content:start;font-size:.8125rem}
+.archive-list h3{grid-column:2;font-size:1.25rem;line-height:1.5;font-weight:600}
+.archive-list p{grid-column:2;font-size:.9375rem;line-height:1.85}
+.archive-arrow{grid-column:3;grid-row:1 / span 2}
+.article-heading{padding-block:8px 40px}
+.article-heading .page-title{line-height:1.25}
+.article-summary{margin-top:24px;line-height:1.8}
+.article-meta{font-size:.8125rem;gap:10px 24px;margin-top:28px}
+.article-reading-layout{padding-top:40px}
+.prose>p{margin-block:20px}
+.prose h2{padding-top:28px;border-top:1px solid var(--c-line);margin-top:56px;margin-bottom:20px}
+.prose h2:first-child{padding-top:0;border-top:0}
+.prose h3{font-weight:600;margin-top:40px}
+.table-wrap{margin-block:28px}
+.table-wrap th{font-size:.875rem;font-weight:600;color:var(--c-ink)}
+.prose blockquote{padding:24px 28px;line-height:1.9}
+.article-reading-end{margin-top:56px;padding-block:24px}
+.article-neighbors{gap:32px;padding-top:32px}
+.article-neighbors strong{font-size:1.0625rem;line-height:1.6}
+@media(max-width:62em){.category-layout{grid-template-columns:170px minmax(0,1fr);gap:36px}}
+@media(max-width:48em){.category-layout{grid-template-columns:1fr;gap:0}.archive-list li>a{grid-template-columns:minmax(0,1fr) 20px;gap:8px 16px;padding-block:24px}.archive-meta{grid-column:1;grid-row:auto}.archive-list h3,.archive-list p{grid-column:1}.archive-arrow{grid-column:2;grid-row:1 / span 3}.article-reading-layout{padding-top:28px}}
+@media(max-width:34em){.category-heading{padding-bottom:24px}.category-heading .page-title{font-size:2rem}.category-description{font-size:.9375rem}.archive-toolbar{padding:16px;gap:14px}.archive-filters select{min-height:44px}.archive-month{margin-top:32px}.archive-list h3{font-size:1.125rem}.archive-list p{font-size:.875rem}.article-heading{padding-block:4px 28px}.article-meta{margin-top:20px}.prose>p{margin-block:16px}.prose h2{margin-top:40px;padding-top:24px}.prose h3{margin-top:32px}.prose blockquote{padding:20px}.article-reading-end{margin-top:40px}.article-neighbors{gap:20px}}

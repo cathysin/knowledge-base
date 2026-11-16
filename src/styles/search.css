@@ -47,3 +47,18 @@
 .page-404 .not-found-topics>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 32px}
 @media(max-width:760px){.page-search,.page-404{width:calc(100% - 48px)}.page-search .search-heading{margin-block:24px}.page-404 .not-found-topics>div{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.page-search,.page-404{width:calc(100% - 40px);padding-block:24px 48px}.page-search .page-title,.page-404 .page-title{font-size:2rem}.page-search .page-lead,.page-404 .page-lead{font-size:.875rem}.page-search .site-search{margin-bottom:24px}.page-search .search-field input{padding-inline:12px;font-size:1rem}.page-search .search-field .btn-primary{padding-inline:18px;font-size:.875rem}.page-search .search-toolbar{align-items:start;gap:14px}.page-search .search-category-filter{width:100%}.page-search .search-category-filter select{flex:1;min-width:0}.page-search .search-topic-links{grid-template-columns:minmax(0,1fr)}.page-search .search-hit-title{font-size:1.0625rem}.page-search .search-result-link{column-gap:14px;padding-block:20px}.page-search .search-hit-excerpt{font-size:.8125rem}.page-search .search-state{padding-top:36px}.page-search .search-state h2{font-size:1.25rem}.page-404{padding-top:42px}.page-404 .page-404-actions{flex-direction:row;align-items:center}.page-404 .not-found-topics{margin-top:42px}.page-404 .not-found-topics>div{grid-template-columns:minmax(0,1fr)}}
+
+/* Match the archive's reading hierarchy and touch-friendly controls. */
+.page-search .search-heading{margin-block:36px 32px}
+.page-search .page-lead{font-size:1.0625rem}
+.page-search .site-search{max-width:100%;margin-bottom:36px}
+.page-search .search-toolbar{padding:16px 20px;background:var(--c-fill);border:0;border-radius:8px}
+.page-search .search-list>li:first-child{border-top:1px solid var(--c-line)}
+.page-search .search-list{margin-top:24px}
+.page-search .search-result-link{padding-block:28px}
+.page-search .search-hit-meta{font-size:.8125rem}
+.page-search .search-hit-title{font-weight:600}
+.page-search .search-hit-excerpt{font-size:.9375rem;max-width:100%}
+.page-search .search-discover{padding-top:44px}
+.page-search .search-discover h2,.page-404 .not-found-topics h2{font-size:1.125rem;font-weight:600}
+@media(max-width:520px){.page-search .search-heading{margin-block:24px}.page-search .page-lead{font-size:.9375rem}.page-search .search-toolbar{padding:16px}.page-search .search-result-link{padding-block:22px}.page-search .search-hit-title{font-size:1.0625rem}.page-search .search-hit-excerpt{font-size:.875rem}}
