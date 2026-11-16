@@ -82,6 +82,8 @@ front matter 必填：`title`、`date`、`category`（六个 slug 之一）、`s
 - 幂等：同名覆盖；只写 `content/`，不删文件
 - 收件箱默认读仓库同级的 `../knowledge-inbox/`（本机已建好 6 个 bot 子目录）
 - 正文里含本机路径（`/workspace/`、`/Users/` 等）的句子会在导入时整句删掉；删完仍残留路径的文件不导入（T011-r1）
+- 文件名认 `YYYY-MM-DD.md` 和 `YYYY-MM-DD-HHMM.md`（日期取前 10 位）
+- 写入 `content/` 之前清洗正文（T035）：去掉内部流程句和「仅供内部参考」「待 Cathy 确认」等，不改收件箱；「不构成投资建议」「内部调查」「数字未确认」保留。试跑和推送规则见 `docs/T035-autosync.md`
 
 ## 本轮（T013）：11-08 ~ 11-14 按日期补齐（真实数据）
 
@@ -151,7 +153,7 @@ Firefox 不支持 `text-wrap: pretty`；Firefox 320px 下首页标题可能出�
 
 下轮修（QA T005-C v2）：① 搜索「港股」混进分类页和元数据；② 面包屑「首页」宽不足 44；③「回到最新列表」点击区域偏小；④「AI 情报」宽约 43.8px；⑤ 分类名空格不一致；⑥ 表格隐藏标题都是「数据表」；⑦ 同 Firefox pretty。
 
-还没做：自动推送流水线（先整体过 QA；构建失败不推；自动提交只改内容目录）。
+自动推送的脚本在 T035（`scripts/sync-inbox.mjs`，说明见 `docs/T035-autosync.md`）。默认不提交、不推送，等 QA。构建失败不提交、不推送；自动提交只改 `content/`。GitHub Actions 不去读盒子上的收件箱。
 
 ## 上线清单
 

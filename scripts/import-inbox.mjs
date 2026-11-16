@@ -1,15 +1,18 @@
-// T012-B：把 knowledge-inbox/<bot>/<YYYY-MM-DD>.md 导入 content/<slug>/<YYYY>/<YYYY-MM-DD>-<slot>.md。
+// T012-B / T035：把 knowledge-inbox/<bot>/<YYYY-MM-DD>.md
+// 或 <YYYY-MM-DD-HHMM>.md 导入 content/<slug>/<YYYY>/<YYYY-MM-DD>-<slot>.md。
 // 用法：node scripts/import-inbox.mjs [收件箱目录]（默认 ../knowledge-inbox）
-// 幂等：重复跑只覆盖同名输出文件；只写 content/ 目录，不删任何文件。
+// 幂等：重复跑只覆盖同名输出文件；只写 content/ 目录，不删任何文件，不改收件箱。
 // 不写 compliance_checked（这些推送没过合规审查）；不在正文末尾另加免责声明（页脚已有）。
 // 发现疑似敏感信息（邮箱、密钥/令牌、账户号码）的文件不导入，脚本以非 0 退出。
 // 正文里含本机路径（/workspace/ 等）的句子整句删掉；删完还残留路径的文件不导入。
+// 写入 content/ 之前清洗正文（T035）：去掉内部流程句和 Cathy /「仅供内部参考」字样，
+// 保留「不构成投资建议」以及新闻事实里的「内部调查」「数字未确认」。
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CONTENT = join(ROOT, 'content');
-const INBOX = resolve(process.argv[2] ?? join(ROOT, '..', 'knowledge-inbox'));
 
 const BOT_TO_SLUG = {
   '每日推送': 'cm-knowledge',
@@ -42,8 +45,15 @@ const SENSITIVE = [
 // 本机路径：/workspace/、/home/、/cursor/ 等开头。
 const LOCAL_PATH = /(?:^|[\s`'"(（：:，,])\/(?:workspace|home|cursor|tmp|root|Users|mnt|opt)\//;
 
+/** YYYY-MM-DD.md 与 YYYY-MM-DD-HHMM.md 取日期；其他仍含日期的文件名保持原有兜底。 */
+export function fileDateOf(filename) {
+  const named = String(filename).match(/^(\d{4}-\d{2}-\d{2})(?:-\d{4})?\.md$/);
+  if (named) return named[1];
+  return (String(filename).match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
+}
+
 /** 删掉含本机路径的句子（代码块外）；整行删空就去掉这一行。 */
-function stripLocalPaths(body) {
+export function stripLocalPaths(body) {
   let inFence = false;
   const out = [];
   for (const line of body.split(/\r?\n/)) {
@@ -53,6 +63,171 @@ function stripLocalPaths(body) {
     if (kept.trim()) out.push(kept);
   }
   return out.join('\n');
+}
+
+/** 标题或正文里的「（待确认）」「（待 Cathy 确认）」。括号外的新闻事实不动。 */
+export function stripPendingParens(s) {
+  return String(s)
+    .replace(/[ \t\u3000]*[（(]\s*待(?:\s*Cathy\s*)?确认\s*[）)][ \t\u3000]*/gi, ' ')
+    .replace(/[ \t]{2,}/g, ' ');
+}
+
+function stripInternalPhrase(s) {
+  if (!s.includes('仅供内部参考')) return s;
+  return s.replace(/(?:\*\*|__)?仅供内部参考(?:\*\*|__)?(?:[，,、]\s*)?/g, '');
+}
+
+function stillProcess(s) {
+  if (/HTML\s*主文件/.test(s)) return true;
+  if (/完整可搜可排序/.test(s)) return true;
+  if (/完整权重复核/.test(s)) return true;
+  if (/18[:：]00\s*完整版/.test(s)) return true;
+  if (/curl\s*核验/i.test(s)) return true;
+  if (/本机(?:已)?核验/.test(s)) return true;
+  if (/curl/i.test(s) && /HTTP\s*200/i.test(s)) return true;
+  if (/待\s*Cathy\s*确认/i.test(s)) return true;
+  if (/以上均?待确认/.test(s)) return true;
+  if (/对外口径待\s*(?:Cathy\s*)?确认/.test(s)) return true;
+  if (/Cathy/i.test(s) && /确认|过目|审阅|审核|定稿|口径/.test(s)) return true;
+  return false;
+}
+
+function hasProtected(s) {
+  return /内部调查|数字未确认|不构成投资建议/.test(s);
+}
+
+function disclaimerTail(s) {
+  const idx = s.search(/不构成投资建议/);
+  if (idx < 0) return '';
+  let tail = s.slice(idx).trim().replace(/^[，,、\s]+/, '');
+  if (!/[。！？.!?]$/.test(tail)) tail += '。';
+  return tail;
+}
+
+function isEffectivelyEmpty(s) {
+  return !/[\u4e00-\u9fffA-Za-z0-9*]/.test(s);
+}
+
+function tidyAfterExcision(s) {
+  let t = s.replace(/[ \t]{2,}/g, ' ');
+  t = t.replace(/^[，,、;；：:\s的但]+/, '');
+  t = t.replace(/[，,、;；\s]+$/, '');
+  t = t.replace(/(?:见|详见)$/, '');
+  return t.trim();
+}
+
+// 同一分句里既有流程用语又有要留下的事实时，只挖掉流程用语。
+const EXCISE = [
+  /完整可搜可排序总表见\s*HTML\s*主文件[。.]?/g,
+  /完整可搜可排序[^，,、。！？!?；;\n]*/g,
+  /见\s*HTML\s*主文件/g,
+  /HTML\s*主文件/g,
+  /完整权重复核放在今日\s*18[:：]00\s*完整版[。.]?/g,
+  /完整权重复核[^，,、。！？!?；;\n]*/g,
+  /完整(?:表|复核)[^，,、。！？!?；;\n]{0,24}?今日\s*18[:：]00\s*完整版/g,
+  /今日\s*18[:：]00\s*完整版/g,
+  /18[:：]00\s*完整版/g,
+  /链接已\s*curl\s*核验为\s*HTTP\s*200[。.]?/gi,
+  /(?:已\s*)?curl\s*核验(?:为\s*HTTP\s*200)?/gi,
+  /本机已核验/g,
+  /本机核验/g,
+  /对外口径待\s*Cathy\s*确认/gi,
+  /对外口径待确认/g,
+  /以上均待\s*Cathy\s*确认/gi,
+  /以上待\s*Cathy\s*确认/gi,
+  /以上均待确认/g,
+  /以上待确认/g,
+  /待\s*Cathy\s*确认/gi,
+  /请\s*Cathy\s*(?:确认|过目|审阅|审核|定稿)/gi,
+  /交\s*Cathy\s*(?:确认|过目|审阅|审核|定稿)/gi,
+  /由\s*Cathy\s*(?:确认|过目|审阅|审核|定稿)/gi,
+  /Cathy\s*(?:确认|过目|审阅|审核|定稿)/gi,
+];
+
+function cleanClause(raw) {
+  const c = stripPendingParens(stripInternalPhrase(raw)).trim();
+  if (!c || isEffectivelyEmpty(c)) return disclaimerTail(raw);
+  if (stillProcess(c) && !hasProtected(c)) return disclaimerTail(c);
+  if (!stillProcess(c)) return c;
+  let next = c;
+  for (const re of EXCISE) {
+    re.lastIndex = 0;
+    next = next.replace(re, '');
+  }
+  next = tidyAfterExcision(next);
+  if (isEffectivelyEmpty(next)) return disclaimerTail(c);
+  return next;
+}
+
+function preferDisclaimer(s) {
+  return s.replace(/^(?:本报告|本档|本文|本稿|本文件)\s*(?=不构成投资建议)/, '');
+}
+
+function cleanSentence(sentence) {
+  const removedInternal = sentence.includes('仅供内部参考');
+  const stripped = stripPendingParens(stripInternalPhrase(sentence));
+  const pieces = stripped.split(/([，,、])/);
+  const kept = [];
+  let delim = '，';
+  let droppedBefore = false;
+  for (let i = 0; i < pieces.length; i += 2) {
+    if (pieces[i + 1]) delim = pieces[i + 1];
+    const text = cleanClause(pieces[i] ?? '');
+    if (isEffectivelyEmpty(text)) { droppedBefore = true; continue; }
+    let piece = text.trim();
+    if (droppedBefore) piece = piece.replace(/^(?:但是|但|并且|而且)/, '');
+    if (isEffectivelyEmpty(piece)) { droppedBefore = true; continue; }
+    kept.push(piece);
+    droppedBefore = false;
+  }
+  if (!kept.length) return disclaimerTail(sentence);
+  let joined = kept.join(delim);
+  joined = joined.replace(/[，,]{2,}/g, (m) => m[0]).replace(/^[，,\s]+/, '').replace(/\s+([，,。！？!?；;])/g, '$1');
+  if (/[。！？!?；;]$/.test(stripped) && !/[。！？!?；;]$/.test(joined)) {
+    joined += stripped.match(/[。！？!?；;]$/)[0];
+  }
+  if (removedInternal) joined = preferDisclaimer(joined);
+  return joined;
+}
+
+function cleanSentences(text) {
+  const parts = String(text).match(/[^。！？!?；;]+[。！？!?；;]?/g);
+  if (!parts) return String(text);
+  const kept = [];
+  for (const part of parts) {
+    const c = cleanSentence(part);
+    if (isEffectivelyEmpty(c)) continue;
+    kept.push(c);
+  }
+  return kept.join('');
+}
+
+function cleanLine(line) {
+  const heading = line.match(/^(\s*#{1,6}\s+)(.*)$/);
+  if (heading) {
+    const rest = cleanSentences(heading[2]).trim();
+    if (!rest || isEffectivelyEmpty(rest)) return '';
+    return `${heading[1].replace(/\s+$/, '')} ${rest}`.replace(/[ \t]{2,}/g, ' ');
+  }
+  const listed = line.match(/^(\s*(?:>\s*)*(?:[-*+]|\d+\.)\s+)(.*)$/);
+  if (listed) {
+    const rest = cleanSentences(listed[2]).trim();
+    if (isEffectivelyEmpty(rest)) return '';
+    return listed[1] + rest;
+  }
+  return cleanSentences(line);
+}
+
+/** 清洗即将写入 content/ 的正文。纯函数，不读不写收件箱。 */
+export function cleanImportedBody(body) {
+  const out = [];
+  for (const line of String(body).split(/\r?\n/)) {
+    if (line.trim() === '') { out.push(''); continue; }
+    const cleaned = cleanLine(line);
+    if (cleaned.trim() === '') continue;
+    out.push(cleaned.replace(/[ \t]+$/g, ''));
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
 }
 
 function parseFrontMatter(raw) {
@@ -132,62 +307,83 @@ function fixHeadings(body, title) {
   return out.join('\n').replace(/^\s*\n/, '').trimEnd() + '\n';
 }
 
+function cleanedSummary(summary) {
+  if (!summary) return '';
+  const s = cleanImportedBody(summary).replace(/\s+/g, ' ').trim();
+  if (!s || s.length > 120) return '';
+  if (/不构成投资建议|仅供参考/.test(s) && s.length < 160) return '';
+  return s;
+}
+
 const yamlStr = (s) => JSON.stringify(String(s));
 
-const results = [];
-const skipped = [];
-let hadError = false;
-for (const bot of readdirSync(INBOX).sort()) {
-  const dir = join(INBOX, bot);
-  if (!statSync(dir).isDirectory()) continue;
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.md')).sort()) {
-    const src = join(dir, f);
-    const raw = readFileSync(src, 'utf8');
-    const hits = SENSITIVE.filter(([re]) => re.test(raw)).map(([, why]) => why);
-    if (hits.length) { skipped.push({ src, reason: hits.join('、') }); hadError = true; continue; }
-
-    const { data, body: body0 } = parseFrontMatter(raw);
-    let body = stripLocalPaths(body0);
-    let title = data.title;
-    if (!title) {
-      const h = body.match(/^#\s+(.+?)\s*#*\s*$/m);
-      title = h ? stripMd(h[1]) : '';
-    }
-    const fileDate = (f.match(/(\d{4}-\d{2}-\d{2})/) || [])[1];
-    const date = (data.date || fileDate || '').slice(0, 10);
-    const source_bot = data.source_bot || bot;
-    const category = BOT_TO_SLUG[source_bot] ?? BOT_TO_SLUG[bot] ?? data.category;
-    const errs = [];
-    if (!title) errs.push('没有标题');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push('没有日期');
-    if (!category || !Object.values(BOT_TO_SLUG).includes(category)) errs.push(`分类未知（${bot}）`);
-    body = fixHeadings(body, title);
-    const slot = detectSlot(title, data.slot);
-    const summary = (data.summary && data.summary.length <= 120 ? data.summary : makeSummary(body));
-    if (!summary) errs.push('提不出摘要');
-    if (!body.trim()) errs.push('正文为空');
-    if (LOCAL_PATH.test(body)) errs.push('删句后仍含本机路径');
-    if (errs.length) { skipped.push({ src, reason: errs.join('、') }); hadError = true; continue; }
-
-    const outPath = join(CONTENT, category, date.slice(0, 4), `${date}-${slot}.md`);
-    const rel = relative(CONTENT, outPath);
-    if (rel.startsWith('..') || rel.includes(`..${sep}`)) throw new Error(`输出路径越出 content/：${outPath}`);
-    const fm = [
-      '---',
-      `title: ${yamlStr(title)}`,
-      `date: ${date}`,
-      `category: ${category}`,
-      `source_bot: ${yamlStr(source_bot)}`,
-      `slot: ${slot}`,
-      `summary: ${yamlStr(summary)}`,
-      '---',
-      '',
-    ].join('\n');
-    mkdirSync(join(CONTENT, category, date.slice(0, 4)), { recursive: true });
-    const existed = existsSync(outPath);
-    writeFileSync(outPath, fm + body);
-    results.push({ out: relative(ROOT, outPath), title, category, slot, summaryLen: summary.length, overwrote: existed });
+function main() {
+  const INBOX = resolve(process.argv[2] ?? join(ROOT, '..', 'knowledge-inbox'));
+  let bots;
+  try {
+    bots = readdirSync(INBOX);
+  } catch (err) {
+    console.error(`打不开收件箱 ${INBOX}: ${err.message}`);
+    process.exit(1);
   }
+
+  const results = [];
+  const skipped = [];
+  let hadError = false;
+  for (const bot of bots.sort()) {
+    const dir = join(INBOX, bot);
+    if (!statSync(dir).isDirectory()) continue;
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.md')).sort()) {
+      const src = join(dir, f);
+      const raw = readFileSync(src, 'utf8');
+      const hits = SENSITIVE.filter(([re]) => re.test(raw)).map(([, why]) => why);
+      if (hits.length) { skipped.push({ src, reason: hits.join('、') }); hadError = true; continue; }
+
+      const { data, body: body0 } = parseFrontMatter(raw);
+      let body = cleanImportedBody(stripLocalPaths(body0));
+      let title = data.title ? cleanSentences(data.title).trim() : '';
+      if (!title) {
+        const h = body.match(/^#\s+(.+?)\s*#*\s*$/m);
+        title = h ? cleanSentences(stripMd(h[1])).trim() : '';
+      }
+      const date = (data.date || fileDateOf(f) || '').slice(0, 10);
+      const source_bot = data.source_bot || bot;
+      const category = BOT_TO_SLUG[source_bot] ?? BOT_TO_SLUG[bot] ?? data.category;
+      const errs = [];
+      if (!title) errs.push('没有标题');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push('没有日期');
+      if (!category || !Object.values(BOT_TO_SLUG).includes(category)) errs.push(`分类未知（${bot}）`);
+      body = fixHeadings(body, title);
+      const slot = detectSlot(title, data.slot);
+      const summary = cleanedSummary(data.summary) || makeSummary(body);
+      if (!summary) errs.push('提不出摘要');
+      if (!body.trim()) errs.push('正文为空');
+      if (LOCAL_PATH.test(body)) errs.push('删句后仍含本机路径');
+      if (errs.length) { skipped.push({ src, reason: errs.join('、') }); hadError = true; continue; }
+
+      const outPath = join(CONTENT, category, date.slice(0, 4), `${date}-${slot}.md`);
+      const rel = relative(CONTENT, outPath);
+      if (rel.startsWith('..') || rel.includes(`..${sep}`)) throw new Error(`输出路径越出 content/：${outPath}`);
+      const fm = [
+        '---',
+        `title: ${yamlStr(title)}`,
+        `date: ${date}`,
+        `category: ${category}`,
+        `source_bot: ${yamlStr(source_bot)}`,
+        `slot: ${slot}`,
+        `summary: ${yamlStr(summary)}`,
+        '---',
+        '',
+      ].join('\n');
+      mkdirSync(join(CONTENT, category, date.slice(0, 4)), { recursive: true });
+      const existed = existsSync(outPath);
+      writeFileSync(outPath, fm + body);
+      results.push({ out: relative(ROOT, outPath), title, category, slot, summaryLen: summary.length, overwrote: existed });
+    }
+  }
+  console.log(JSON.stringify({ imported: results, skipped }, null, 2));
+  if (hadError) process.exit(1);
 }
-console.log(JSON.stringify({ imported: results, skipped }, null, 2));
-if (hadError) process.exit(1);
+
+const isDirect = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (isDirect) main();
