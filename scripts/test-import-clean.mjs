@@ -419,6 +419,109 @@ check('failed import does not commit', () => {
   assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /npm run build/);
 });
 
+function trailingWs(s) {
+  return s.match(/[ \t]*$/)[0];
+}
+
+/** output 必须是 source 删掉若干段之后的结果，不能改写留下来的字符。 */
+function deletedPieces(source, output) {
+  const pieces = [];
+  let si = 0;
+  for (let oi = 0; oi < output.length; oi++) {
+    if (si < source.length && source[si] === output[oi]) { si++; continue; }
+    const start = si;
+    while (si < source.length && source[si] !== output[oi]) si++;
+    if (si >= source.length) return null;
+    pieces.push(source.slice(start, si));
+    si++;
+  }
+  if (si < source.length) pieces.push(source.slice(si));
+  return pieces;
+}
+
+check('preserves number commas and enumeration marks when a mid-sentence phrase is removed', () => {
+  const src = '成交量 30,000 股、成交额 1,234.5 万，链接已 curl 核验为 HTTP 200，不能当作官方净值。';
+  const out = cleanImportedBody(src);
+  assert.equal(out, '成交量 30,000 股、成交额 1,234.5 万，不能当作官方净值。');
+  assert.equal(out.includes('30，000'), false);
+  assert.equal(out.includes('1，234.5'), false);
+  const untouched = '成交量 30,000 股、成交额 1,234.5 万港元，不能当作官方净值。';
+  assert.equal(cleanImportedBody(untouched), untouched);
+  const mixed = '这不改写已收盘的约 -3.80%，但会进入周一开盘，光通信/PCB、大模型和国产 GPU 仍是最敏感环节。';
+  assert.equal(cleanImportedBody(mixed), mixed);
+});
+
+check('preserves trailing spaces and drops HTML pointer sentences', () => {
+  const label = '**光通信/PCB**（加权约 -9.96%，贡献约 -0.75pp）  ';
+  assert.equal(cleanImportedBody(label), label);
+  assert.equal(trailingWs(cleanImportedBody(label)), '  ');
+  const withDrop = 'foo，链接已 curl 核验为 HTTP 200。  ';
+  const dropped = cleanImportedBody(withDrop);
+  assert.equal(dropped, 'foo。  ');
+  assert.equal(trailingWs(dropped), '  ');
+  const html = '上周五已完成收市。按已确认口径加权约 -3.80%。主线是成长回吐，组合跌幅大于恒指、也略深于恒科。详细价量表见 HTML。';
+  assert.equal(
+    cleanImportedBody(html),
+    '上周五已完成收市。按已确认口径加权约 -3.80%。主线是成长回吐，组合跌幅大于恒指、也略深于恒科。',
+  );
+  assert.equal(cleanImportedBody('详细价量表见 HTML。'), '');
+  assert.equal(cleanImportedBody('权重见 HTML。'), '');
+  assert.equal(cleanImportedBody('详情见 HTML 主文件。'), '');
+  assert.equal(cleanImportedBody('完整可搜可排序总表见 HTML 主文件。'), '');
+});
+
+check('keeps protected factual phrases', () => {
+  const src = [
+    '监管已启动内部调查，数字未确认。',
+    '雅虎财经称讨论过回归，未经公司确认。',
+    '该价格未确认。',
+    '仅供参考，不构成投资建议。',
+  ].join('\n');
+  assert.equal(cleanImportedBody(src), src);
+  assert.equal(
+    cleanImportedBody('链接已 curl 核验为 HTTP 200，未经公司确认。'),
+    '未经公司确认。',
+  );
+  assert.equal(
+    cleanImportedBody('以上待确认，内部调查仍在继续，数字未确认。'),
+    '内部调查仍在继续，数字未确认。',
+  );
+});
+
+check('0900 fixture drops only the process spans', () => {
+  const src = readFileSync(join(repo, 'scripts/fixtures/2026-11-16-0900.md'), 'utf8');
+  const out = cleanImportedBody(src);
+  const drops = [
+    '完整权重复核放在今日 18:00 完整版。',
+    '完整可搜可排序总表见 HTML 主文件。',
+    '链接已 curl 核验为 HTTP 200。',
+    '详细价量表见 HTML。',
+  ];
+  for (const sentence of drops) assert.equal(out.includes(sentence), false, sentence);
+  assert.equal(out.includes('30,000'), true);
+  assert.equal(out.includes('30，000'), false);
+  assert.match(out, /未经公司确认/);
+  assert.match(out, /仅供参考，不构成投资建议。/);
+  assert.equal(cleanImportedBody(out), out);
+
+  const srcLines = src.split('\n');
+  const outLines = out.split('\n');
+  const rebuilt = [];
+  for (const line of srcLines) {
+    if (line.trim() === '') { rebuilt.push(''); continue; }
+    const alone = cleanImportedBody(line);
+    if (alone === '') continue;
+    const removed = deletedPieces(line, alone);
+    assert.notEqual(removed, null, `rewrote a kept line:\n${JSON.stringify(line)}\n${JSON.stringify(alone)}`);
+    assert.equal(trailingWs(alone), trailingWs(line), JSON.stringify(line));
+    rebuilt.push(alone);
+  }
+  let rebuiltText = rebuilt.join('\n');
+  rebuiltText = rebuiltText.replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
+  assert.equal(rebuiltText, out);
+  assert.equal(outLines.length, rebuilt.length);
+});
+
 if (failed) {
   console.error(`${failed} failed`);
   process.exit(1);
