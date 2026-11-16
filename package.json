@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --host 127.0.0.1 --port 4321",
-    "build": "astro build && node scripts/enhance-tables.mjs dist && pagefind --site dist && node scripts/verify-dist.mjs dist",
+    "build": "astro build && node scripts/enhance-reading.mjs dist && node scripts/enhance-tables.mjs dist && pagefind --site dist && node scripts/verify-dist.mjs dist",
     "preview": "astro preview --host 127.0.0.1 --port 4321",
     "selfcheck": "node scripts/selfcheck.mjs",
     "test:clean": "node scripts/test-import-clean.mjs"

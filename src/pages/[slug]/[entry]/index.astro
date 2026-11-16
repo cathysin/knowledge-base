@@ -63,6 +63,7 @@ const showSummary=post&&!plainForCompare(post.body??'').slice(0,1600).includes(p
   const firstList = prose?.firstElementChild;
   if (firstList?.tagName === 'UL' && /日期|来源 bot|课程位置|口径|标题|覆盖/.test(firstList.textContent ?? '')) {
     const details = document.createElement('details');
+    details.className = 'article-archive-info';
     const summary = document.createElement('summary');
     summary.textContent = '归档信息与数据口径';
     firstList.before(details);

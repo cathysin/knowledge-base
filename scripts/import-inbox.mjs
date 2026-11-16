@@ -435,7 +435,7 @@ export function normalizeMarketBriefLayout(body) {
     if (/^(?:来源：|下跌方面，)/.test(line) && output.length && output.at(-1).trim() && !/^\s*(?:[-*+]|\d+\.)\s/.test(output.at(-1))) output.push('');
     output.push(line);
   }
-  return output.join('\n');
+  return output.join('\n').replace(/。(?=主板成交额 1,741\.08|餐饮、乳制品等消费股|内银股偏强，工商银行|腾讯控股收报 390\.4|部分行情页把港股通)/g, '。\n\n');
 }
 
 /** 将新闻影响的明确字段标签提升为小标题，不改动普通加粗文本。 */
