@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chooseOutputSlot, cleanImportedBody, fileClockOf, fileDateOf, stripLocalPaths } from './import-inbox.mjs';
+import { chooseOutputSlot, cleanImportedBody, fileClockOf, fileDateOf, normalizeAiIntelLayout, normalizeMarketBriefLayout, normalizeNewsImpactLayout, stripLocalPaths } from './import-inbox.mjs';
 import { classifyChanges, isContentPath, parseArgs, parsePorcelainZ, suggestCommitMessage } from './sync-inbox.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
@@ -27,6 +27,46 @@ const THREE = [
   '完整可搜可排序总表见 HTML 主文件。',
   '链接已 curl 核验为 HTTP 200。',
 ];
+
+check('market brief sections remain semantic and normalized idempotently', () => {
+  const src = '1. 全天收市表现\n恒指 23,753.84 点。\n来源：港股360。\n\n2. 板块涨跌与个股\n行业表现。\n下跌方面，联想跌 5.9%。\n\n3. 南向资金\n净卖出 42.26 亿港元。\n\n4. 明日关注\n- 关注业绩。\n';
+  const out = normalizeMarketBriefLayout(src);
+  assert.match(out, /## 1\. 全天收市表现\n\n恒指 23,753\.84 点。\n\n来源：港股360。/);
+  assert.match(out, /## 4\. 明日关注\n\n- 关注业绩。/);
+  assert.match(out, /行业表现。\n\n下跌方面，联想跌 5\.9%。/);
+  assert.equal(normalizeMarketBriefLayout(out), out);
+  assert.equal(out.replace(/^## /gm, '').replace(/\s/g, ''), src.replace(/\s/g, ''));
+});
+
+check('ordinary ordered lists, tables, fenced examples and details stay unchanged', () => {
+  const src = '1. 全天收市表现\n2. 板块涨跌与个股\n\n| 项目 | 数字 |\n|---|---|\n| 恒指 | 23,753.84 |\n\n```md\n1. 全天收市表现\n来源：示例\n```\n\n<details>\n1. 全天收市表现\n示例说明\n</details>\n';
+  assert.equal(normalizeMarketBriefLayout(src), src);
+});
+
+check('news labels become headings while ordinary bold text and references survive', () => {
+  const src = '**① 新闻概要**\n\n新闻事实与**关键数字**。\n\n**② 影响行业与板块**\n\n科技。\n\n**③ 影响方向**：中性\n\n**④ 影响原因分析 · 三步传导链**\n\n原因。\n\n来源：\n\n- [原文](https://example.com/a)\n';
+  const out = normalizeNewsImpactLayout(src);
+  assert.match(out, /#### ① 新闻概要\n\n新闻事实与\*\*关键数字\*\*。/);
+  assert.match(out, /#### ③ 影响方向：\n\n中性/);
+  assert.match(out, /#### 来源：\n\n- \[原文\]\(https:\/\/example\.com\/a\)/);
+  assert.equal(normalizeNewsImpactLayout(out), out);
+  assert.equal(out.replace(/^#### /gm, '').replace(/\s|\*\*/g, ''), src.replace(/\s|\*\*/g, ''));
+  const unchanged = '```\n**① 新闻概要**\n```\n\n<details>\n**① 新闻概要**\n</details>\n\n**新闻概要，但不是标签**\n';
+  assert.equal(normalizeNewsImpactLayout(unchanged), unchanged);
+});
+
+check('AI field headings preserve nested paragraphs and source list', () => {
+  const src = '## 1. 消息\n- **发生了什么：** 首段。\n\n  第二段，保留数字 1,234。\n\n- **来源：**\n  - 路透：https://example.com/a\n  - 公司：https://example.com/b\n- **对你的工作意味着什么：** 保持审慎。\n- 白话：**术语** = 含义。\n\n## 2. 下条\n普通正文。\n';
+  const out = normalizeAiIntelLayout(src);
+  assert.match(out, /### 发生了什么\n\n首段。\n\n第二段，保留数字 1,234。/);
+  assert.match(out, /### 参考来源\n\n- 路透：https:\/\/example\.com\/a\n- 公司：https:\/\/example\.com\/b/);
+  assert.match(out, /### 对你的工作意味着什么\n\n保持审慎。/);
+  assert.match(out, /### 白话\n\n\*\*术语\*\* = 含义。/);
+  assert.equal(normalizeAiIntelLayout(out), out);
+  for (const text of ['首段。','第二段，保留数字 1,234。','https://example.com/a','https://example.com/b','保持审慎。','**术语** = 含义。']) assert.ok(out.includes(text));
+  const unchanged = '```md\n- **发生了什么：** 示例\n```\n\n<details>\n- **来源：** 私有练习\n</details>\n\n- **其他标签：** 原样保留。\n  - 子列表\n';
+  assert.equal(normalizeAiIntelLayout(unchanged), unchanged);
+});
 
 check('strips the three process sentences and keeps news facts', () => {
   const src = [

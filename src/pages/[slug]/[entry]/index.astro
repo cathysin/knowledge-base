@@ -35,6 +35,9 @@ if(kind==='article'&&post){
   const rendered=await render(post);Content=rendered.Content;headings=rendered.headings.filter((heading)=>heading.depth>=2&&heading.depth<=3);
 }
 const metaDate=post?(post.data.sample?'示例':ymd(post.data.date)):'';
+// 摘要与文章开头完全重复时直接展示正文，避免同一段文字出现两次。
+const plainForCompare=(text:string)=>text.replace(/\*\*/g,'').replace(/\s/g,'');
+const showSummary=post&&!plainForCompare(post.body??'').slice(0,1600).includes(plainForCompare(post.data.summary));
 ---
 {kind==='year'&&year ? (
   <Base topic={`${cat.name} ${year}`} description={cat.desc}>
@@ -44,7 +47,7 @@ const metaDate=post?(post.data.sample?'示例':ymd(post.data.date)):'';
   <Base topic={post.data.title} description={post.data.summary}>
     <article class="page page-article" data-pagefind-body>
       <div data-pagefind-ignore="all"><Breadcrumb items={[{label:'首页',href:withBase('/')},{label:cat.name,href:withBase(`/${cat.slug}/`)}]} /></div>
-      <header class="article-heading"><p class="article-category"><a href={withBase(`/${cat.slug}/`)}>{cat.name}</a><span>{slotLabel(post.data.slot)}</span></p><h1 class="page-title" data-pagefind-meta="title">{post.data.title}</h1><p class="article-summary">{post.data.summary}</p><p class="article-meta"><span class="visually-hidden" data-pagefind-meta="category">{cat.name}</span><time datetime={ymd(post.data.date)} data-pagefind-meta="date">{metaDate}</time><span data-pagefind-meta="slot">{slotLabel(post.data.slot)}</span><span>来源：{post.data.source_bot}</span>{post.data.as_of&&<span>数据截至 {ymd(post.data.as_of)}</span>}</p>{lessonInfo&&<p class="article-lesson"><span class="lesson-serial">{lessonInfo.serial}</span><span>主题 {lessonInfo.topicIndex}/{lessonInfo.topicTotal} · {lessonInfo.topic} · {lessonInfo.section}</span></p>}</header>
+      <header class="article-heading"><p class="article-category"><a href={withBase(`/${cat.slug}/`)}>{cat.name}</a><span>{slotLabel(post.data.slot)}</span></p><h1 class="page-title" data-pagefind-meta="title">{post.data.title}</h1>{showSummary&&<p class="article-summary">{post.data.summary}</p>}<p class="article-meta"><span class="visually-hidden" data-pagefind-meta="category">{cat.name}</span><time datetime={ymd(post.data.date)} data-pagefind-meta="date">{metaDate}</time><span data-pagefind-meta="slot">{slotLabel(post.data.slot)}</span><span>来源：{post.data.source_bot}</span>{post.data.as_of&&<span>数据截至 {ymd(post.data.as_of)}</span>}</p>{lessonInfo&&<p class="article-lesson"><span class="lesson-serial">{lessonInfo.serial}</span><span>主题 {lessonInfo.topicIndex}/{lessonInfo.topicTotal} · {lessonInfo.topic} · {lessonInfo.section}</span></p>}</header>
       {headings.length>0&&<details class="article-mobile-toc" data-pagefind-ignore="all"><summary>本文目录 <span>{headings.length} 个部分</span></summary><nav aria-label="手机本文目录">{headings.map((heading)=><a href={`#${heading.slug}`} class:list={{'toc-subheading':heading.depth===3}}>{heading.text}</a>)}</nav></details>}
       <div class="article-reading-layout"><div class="article-reading-body"><div class="prose"><Content /></div>
         {post.data.sources&&post.data.sources.length>0&&<section class="article-sources" aria-labelledby="article-sources-heading"><h2 id="article-sources-heading">参考来源</h2><ul>{post.data.sources.map((source)=><li>{/^https?:\/\//.test(source)?<a href={source}>{source}</a>:source}</li>)}</ul></section>}

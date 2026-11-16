@@ -409,6 +409,94 @@ function fixHeadings(body, title) {
   return out.join('\n').replace(/^\s*\n/, '').trimEnd() + '\n';
 }
 
+/** 把盘后简报中已知的章节行转为标题，避免普通编号列表和正文被误判。 */
+export function normalizeMarketBriefLayout(body) {
+  const lines = String(body).split(/\r?\n/);
+  const sections = /^(\d+)\.\s+(全天收市表现|板块涨跌与个股|南向资金|明日关注|早盘走势|主要板块|异动个股)\s*$/;
+  const output = [];
+  let inFence = false;
+  let inDetails = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; output.push(line); continue; }
+    if (/^\s*<details\b/i.test(line)) inDetails = true;
+    if (inFence || inDetails) {
+      output.push(line);
+      if (/<\/details>/i.test(line)) inDetails = false;
+      continue;
+    }
+    const section = line.match(sections);
+    const next = lines[i + 1] ?? '';
+    if (section && (i === 0 || lines[i - 1].trim() === '') && next.trim() && !/^\d+\.\s/.test(next)) {
+      output.push(`## ${section[1]}. ${section[2]}`, '');
+      continue;
+    }
+    // 仅拆分已知的来源或正文段落标签，保留所有原文与链接。
+    if (/^(?:来源：|下跌方面，)/.test(line) && output.length && output.at(-1).trim() && !/^\s*(?:[-*+]|\d+\.)\s/.test(output.at(-1))) output.push('');
+    output.push(line);
+  }
+  return output.join('\n');
+}
+
+/** 将新闻影响的明确字段标签提升为小标题，不改动普通加粗文本。 */
+export function normalizeNewsImpactLayout(body) {
+  const lines = String(body).split(/\r?\n/);
+  const output = [];
+  let inFence = false;
+  let inDetails = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; output.push(line); continue; }
+    if (/^\s*<details\b/i.test(line)) inDetails = true;
+    if (inFence || inDetails) {
+      output.push(line);
+      if (/<\/details>/i.test(line)) inDetails = false;
+      continue;
+    }
+    const label = line.match(/^\*\*([①②④]\s*(?:新闻概要|影响行业与板块|影响原因分析[^*]*))\*\*\s*$/);
+    const direction = line.match(/^\*\*(③\s*影响方向)\*\*([：:]\s*)(\S.*)$/);
+    if (label) { output.push(`#### ${label[1]}`); continue; }
+    if (direction) { output.push(`#### ${direction[1]}${direction[2].trim()}`, '', direction[3]); continue; }
+    if (/^(?:来源|出处)[:：]\s*$/.test(line) && /^\s*[-*+]\s+/.test(lines.slice(i + 1).find((item) => item.trim()) ?? '')) {
+      output.push(`#### ${line.trim()}`);
+      continue;
+    }
+    output.push(line);
+  }
+  return output.join('\n');
+}
+
+/** 把 AI 情报的固定字段从顶层列表改为小标题，保留字段内段落和来源列表。 */
+export function normalizeAiIntelLayout(body) {
+  const lines = String(body).split(/\r?\n/);
+  const output = [];
+  let field = false, inFence = false, inDetails = false;
+  const marker = /^- (?:\*\*(发生了什么|来源|对你的工作意味着什么)[：:]?\*\*[：:]?|(?<plain>白话)[：:])\s*(.*)$/;
+  for (const raw of lines) {
+    const line = field && /^  /.test(raw) ? raw.slice(2) : raw;
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; output.push(line); continue; }
+    if (!inFence && /^\s*<details\b/i.test(line)) inDetails = true;
+    if (inFence || inDetails) {
+      output.push(line);
+      if (/<\/details>/i.test(line)) inDetails = false;
+      continue;
+    }
+    const match = raw.match(marker);
+    if (match) {
+      field = true;
+      const label = match[1] || match.groups.plain;
+      const title = label === '来源' ? '参考来源' : label;
+      if (output.length && output.at(-1).trim()) output.push('');
+      output.push(`### ${title}`, '');
+      if (match[3]) output.push(match[3]);
+      continue;
+    }
+    if (field && raw.trim() && !/^  /.test(raw)) field = false;
+    output.push(line);
+  }
+  return output.join('\n');
+}
+
 function cleanedSummary(summary) {
   if (!summary) return '';
   const s = cleanImportedBody(summary).replace(/\s+/g, ' ').trim();
@@ -456,6 +544,9 @@ function main() {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push('没有日期');
       if (!category || !Object.values(BOT_TO_SLUG).includes(category)) errs.push(`分类未知（${bot}）`);
       body = fixHeadings(body, title);
+      if (category === 'market-brief') body = normalizeMarketBriefLayout(body);
+      if (category === 'news-impact') body = normalizeNewsImpactLayout(body);
+      if (category === 'ai-intel') body = normalizeAiIntelLayout(body);
       const detected = detectSlot(title, data.slot);
       const sourceRel = relative(INBOX, src).split(sep).join('/');
       const clock = fileClockOf(f);
