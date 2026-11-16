@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { cleanImportedBody, fileDateOf, stripLocalPaths } from './import-inbox.mjs';
+import { chooseOutputSlot, cleanImportedBody, fileClockOf, fileDateOf, stripLocalPaths } from './import-inbox.mjs';
 import { classifyChanges, isContentPath, parseArgs, parsePorcelainZ, suggestCommitMessage } from './sync-inbox.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
@@ -272,12 +272,143 @@ check('sensitive inbox files are skipped and left untouched', () => {
   }
 });
 
+check('盘中 title writes an HHMM page', () => {
+  assert.equal(fileClockOf('2026-11-16-1400.md'), '1400');
+  assert.equal(fileClockOf('2026-11-16.md'), '');
+  assert.equal(chooseOutputSlot('daily', {
+    title: '2835 成分股日报 · 2026-11-16 14:00 盘中简版',
+    clock: '1400',
+    existingSource: '2835日报/2026-11-16-0900.md',
+    sourceRel: '2835日报/2026-11-16-1400.md',
+  }), '1400');
+  assert.equal(chooseOutputSlot('pre', {
+    title: '开盘前简报',
+    clock: '0900',
+    existingSource: '',
+    sourceRel: '行情分析/2026-11-16-0900.md',
+  }), 'pre');
+  assert.equal(chooseOutputSlot('post', {
+    title: '盘后简报',
+    clock: '1800',
+    existingSource: '',
+    sourceRel: '行情分析/2026-11-16-1800.md',
+  }), 'post');
+
+  const inbox = mkdtempSync(join(tmpdir(), 'kb-mid-'));
+  const bot = join(inbox, '新闻影响');
+  mkdirSync(bot);
+  writeFileSync(join(bot, '2099-08-01-1400.md'), [
+    '# 新闻 盘中简版',
+    '',
+    '监管已启动内部调查，数字未确认。盘中权重近似贡献约 -1%。',
+    '',
+  ].join('\n'));
+  const year = join(repo, 'content/news-impact/2099');
+  const yearExisted = existsSync(year);
+  const daily = join(year, '2099-08-01-daily.md');
+  const page = join(year, '2099-08-01-1400.md');
+  const run = () => spawnSync(process.execPath, ['scripts/import-inbox.mjs', inbox], { cwd: repo, encoding: 'utf8' });
+  try {
+    const first = run();
+    assert.equal(first.status, 0, first.stdout + first.stderr);
+    assert.equal(existsSync(daily), false);
+    const written = readFileSync(page, 'utf8');
+    assert.match(written, /盘中简版/);
+    assert.match(written, /slot: "1400"/);
+    assert.match(written, /source: "新闻影响\/2099-08-01-1400.md"/);
+    const second = run();
+    assert.equal(second.status, 0, second.stdout + second.stderr);
+    assert.equal(readFileSync(page, 'utf8'), written);
+    assert.match(second.stdout, /"overwrote": true/);
+    assert.equal(existsSync(daily), false);
+  } finally {
+    rmSync(daily, { force: true });
+    rmSync(page, { force: true });
+    if (!yearExisted) rmSync(year, { recursive: true, force: true });
+    rmSync(inbox, { recursive: true, force: true });
+  }
+});
+
+check('different-source HHMM does not overwrite daily; same source updates in place', () => {
+  assert.equal(chooseOutputSlot('daily', {
+    title: '补充说明',
+    clock: '1530',
+    existingSource: '新闻影响/2099-08-02-0900.md',
+    sourceRel: '新闻影响/2099-08-02-1530.md',
+  }), '1530');
+  assert.equal(chooseOutputSlot('daily', {
+    title: '早报',
+    clock: '0900',
+    existingSource: '新闻影响/2099-08-02-0900.md',
+    sourceRel: '新闻影响/2099-08-02-0900.md',
+  }), 'daily');
+  assert.equal(chooseOutputSlot('pre', {
+    title: '开盘前',
+    clock: '0915',
+    existingSource: '行情分析/a-0900.md',
+    sourceRel: '行情分析/b-0915.md',
+  }), '0915');
+
+  const inbox = mkdtempSync(join(tmpdir(), 'kb-guard-'));
+  const bot = join(inbox, '新闻影响');
+  mkdirSync(bot);
+  writeFileSync(join(bot, '2099-08-02-0900.md'), [
+    '# 早报',
+    '',
+    '监管已启动内部调查，数字未确认。这是早报全文。',
+    '',
+  ].join('\n'));
+  const year = join(repo, 'content/news-impact/2099');
+  const yearExisted = existsSync(year);
+  const daily = join(year, '2099-08-02-daily.md');
+  const page = join(year, '2099-08-02-1530.md');
+  const run = () => spawnSync(process.execPath, ['scripts/import-inbox.mjs', inbox], { cwd: repo, encoding: 'utf8' });
+  try {
+    const first = run();
+    assert.equal(first.status, 0, first.stdout + first.stderr);
+    const dailyOnce = readFileSync(daily, 'utf8');
+    assert.match(dailyOnce, /早报全文/);
+    assert.match(dailyOnce, /source: "新闻影响\/2099-08-02-0900.md"/);
+    assert.match(dailyOnce, /slot: daily/);
+    assert.equal(existsSync(page), false);
+
+    writeFileSync(join(bot, '2099-08-02-1530.md'), [
+      '# 补充说明',
+      '',
+      '监管已启动内部调查，数字未确认。这是另一份来源。',
+      '',
+    ].join('\n'));
+    const second = run();
+    assert.equal(second.status, 0, second.stdout + second.stderr);
+    assert.equal(readFileSync(daily, 'utf8'), dailyOnce);
+    const alt = readFileSync(page, 'utf8');
+    assert.match(alt, /补充说明/);
+    assert.match(alt, /另一份来源/);
+    assert.match(alt, /slot: "1530"/);
+    assert.match(alt, /source: "新闻影响\/2099-08-02-1530.md"/);
+    assert.doesNotMatch(readFileSync(daily, 'utf8'), /另一份来源/);
+
+    const third = run();
+    assert.equal(third.status, 0, third.stdout + third.stderr);
+    assert.equal(readFileSync(daily, 'utf8'), dailyOnce);
+    assert.equal(readFileSync(page, 'utf8'), alt);
+    const imported = JSON.parse(third.stdout).imported;
+    assert.equal(imported.find((row) => row.out.endsWith('2099-08-02-daily.md')).overwrote, true);
+    assert.equal(imported.find((row) => row.out.endsWith('2099-08-02-1530.md')).overwrote, true);
+  } finally {
+    rmSync(daily, { force: true });
+    rmSync(page, { force: true });
+    if (!yearExisted) rmSync(year, { recursive: true, force: true });
+    rmSync(inbox, { recursive: true, force: true });
+  }
+});
+
 check('parses real git status -z', () => {
   const result = spawnSync('git', ['status', '--porcelain=v1', '-uall', '-z'], { cwd: repo, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   const entries = parsePorcelainZ(result.stdout);
-  assert.ok(entries.some((e) => e.path === 'scripts/sync-inbox.mjs'));
   assert.ok(entries.every((e) => e.path && !e.path.includes('\0')));
+  assert.equal(parsePorcelainZ(' M scripts/sync-inbox.mjs\0')[0].path, 'scripts/sync-inbox.mjs');
 });
 
 check('failed import does not commit', () => {
