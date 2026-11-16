@@ -9,7 +9,10 @@
 // 发现疑似敏感信息（邮箱、密钥/令牌、账户号码）的文件不导入，脚本以非 0 退出。
 // 正文里含本机路径（/workspace/ 等）的句子整句删掉；删完还残留路径的文件不导入。
 // 写入 content/ 之前清洗正文（T035）：去掉内部流程句和 Cathy /「仅供内部参考」字样，
-// 保留「不构成投资建议」以及新闻事实里的「内部调查」「数字未确认」。
+// 以及整句指向 HTML 文件/表的「见 HTML」「见 HTML 主文件」。
+// 保留「不构成投资建议」以及新闻事实里的「内部调查」「未确认」「未经公司确认」。
+// 删掉短语或句子时，同一行其余字节保持原样：不重排 ， / 、 / ；，
+// 不动数字里的英文逗号（两侧都是 ASCII 数字），保留被留下的行的行尾空格。
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,11 +77,9 @@ export function stripLocalPaths(body) {
   return out.join('\n');
 }
 
-/** 标题或正文里的「（待确认）」「（待 Cathy 确认）」。括号外的新闻事实不动。 */
+/** 标题或正文里的「（待确认）」「（待 Cathy 确认）」。只删这对括号，不改行内其他空格。 */
 export function stripPendingParens(s) {
-  return String(s)
-    .replace(/[ \t\u3000]*[（(]\s*待(?:\s*Cathy\s*)?确认\s*[）)][ \t\u3000]*/gi, ' ')
-    .replace(/[ \t]{2,}/g, ' ');
+  return String(s).replace(/[（(]\s*待(?:\s*Cathy\s*)?确认\s*[）)]/gi, '');
 }
 
 function stripInternalPhrase(s) {
@@ -87,6 +88,7 @@ function stripInternalPhrase(s) {
 }
 
 function stillProcess(s) {
+  if (/详?见\s*HTML\b/.test(s)) return true;
   if (/HTML\s*主文件/.test(s)) return true;
   if (/完整可搜可排序/.test(s)) return true;
   if (/完整权重复核/.test(s)) return true;
@@ -101,8 +103,39 @@ function stillProcess(s) {
   return false;
 }
 
+function needsClean(s) {
+  if (s.includes('仅供内部参考')) return true;
+  if (/[（(]\s*待(?:\s*Cathy\s*)?确认\s*[）)]/i.test(s)) return true;
+  return stillProcess(s);
+}
+
 function hasProtected(s) {
-  return /内部调查|数字未确认|不构成投资建议/.test(s);
+  return /内部调查|未确认|不构成投资建议/.test(s);
+}
+
+/** ASCII 数字之间的英文逗号是小数/千分位，不是分句分隔符。 */
+function isNumericComma(s, i) {
+  if (s[i] !== ',') return false;
+  const prev = s.charCodeAt(i - 1);
+  const next = s.charCodeAt(i + 1);
+  return prev >= 48 && prev <= 57 && next >= 48 && next <= 57;
+}
+
+/** 按 ， 、 和非数字英文逗号切开，分隔符记在后一段上，便于原样拼回。 */
+function splitClauses(s) {
+  const clauses = [];
+  let start = 0;
+  let sepBefore = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '，' || ch === '、' || (ch === ',' && !isNumericComma(s, i))) {
+      clauses.push({ text: s.slice(start, i), sepBefore });
+      sepBefore = ch;
+      start = i + 1;
+    }
+  }
+  clauses.push({ text: s.slice(start), sepBefore });
+  return clauses;
 }
 
 function disclaimerTail(s) {
@@ -127,6 +160,7 @@ function tidyAfterExcision(s) {
 
 // 同一分句里既有流程用语又有要留下的事实时，只挖掉流程用语。
 const EXCISE = [
+  /详?见\s*HTML(?:\s*主文件)?/g,
   /完整可搜可排序总表见\s*HTML\s*主文件[。.]?/g,
   /完整可搜可排序[^，,、。！？!?；;\n]*/g,
   /见\s*HTML\s*主文件/g,
@@ -154,10 +188,11 @@ const EXCISE = [
 ];
 
 function cleanClause(raw) {
-  const c = stripPendingParens(stripInternalPhrase(raw)).trim();
+  const stripped = stripPendingParens(stripInternalPhrase(raw));
+  const c = stripped.trim();
   if (!c || isEffectivelyEmpty(c)) return disclaimerTail(raw);
   if (stillProcess(c) && !hasProtected(c)) return disclaimerTail(c);
-  if (!stillProcess(c)) return c;
+  if (!stillProcess(c)) return stripped === raw ? raw : stripped;
   let next = c;
   for (const re of EXCISE) {
     re.lastIndex = 0;
@@ -173,25 +208,31 @@ function preferDisclaimer(s) {
 }
 
 function cleanSentence(sentence) {
+  if (!needsClean(sentence)) return sentence;
   const removedInternal = sentence.includes('仅供内部参考');
   const stripped = stripPendingParens(stripInternalPhrase(sentence));
-  const pieces = stripped.split(/([，,、])/);
+  const clauses = splitClauses(stripped);
   const kept = [];
-  let delim = '，';
   let droppedBefore = false;
-  for (let i = 0; i < pieces.length; i += 2) {
-    if (pieces[i + 1]) delim = pieces[i + 1];
-    const text = cleanClause(pieces[i] ?? '');
-    if (isEffectivelyEmpty(text)) { droppedBefore = true; continue; }
-    let piece = text.trim();
-    if (droppedBefore) piece = piece.replace(/^(?:但是|但|并且|而且)/, '');
-    if (isEffectivelyEmpty(piece)) { droppedBefore = true; continue; }
-    kept.push(piece);
+  let changed = stripped !== sentence;
+  for (const clause of clauses) {
+    const text = cleanClause(clause.text);
+    if (isEffectivelyEmpty(text)) { droppedBefore = true; changed = true; continue; }
+    let piece = text;
+    if (droppedBefore) {
+      const next = piece.replace(/^[ \t]*(?:但是|但|并且|而且)/, '');
+      if (next !== piece) changed = true;
+      piece = next;
+    }
+    if (isEffectivelyEmpty(piece)) { droppedBefore = true; changed = true; continue; }
+    if (piece !== clause.text) changed = true;
+    kept.push({ piece, sepBefore: clause.sepBefore });
     droppedBefore = false;
   }
   if (!kept.length) return disclaimerTail(sentence);
-  let joined = kept.join(delim);
-  joined = joined.replace(/[，,]{2,}/g, (m) => m[0]).replace(/^[，,\s]+/, '').replace(/\s+([，,。！？!?；;])/g, '$1');
+  if (!changed) return sentence;
+  let joined = kept[0].piece;
+  for (let i = 1; i < kept.length; i++) joined += kept[i].sepBefore + kept[i].piece;
   if (/[。！？!?；;]$/.test(stripped) && !/[。！？!?；;]$/.test(joined)) {
     joined += stripped.match(/[。！？!?；;]$/)[0];
   }
@@ -202,29 +243,39 @@ function cleanSentence(sentence) {
 function cleanSentences(text) {
   const parts = String(text).match(/[^。！？!?；;]+[。！？!?；;]?/g);
   if (!parts) return String(text);
-  const kept = [];
+  let out = '';
   for (const part of parts) {
+    if (!needsClean(part)) { out += part; continue; }
     const c = cleanSentence(part);
     if (isEffectivelyEmpty(c)) continue;
-    kept.push(c);
+    out += c;
   }
-  return kept.join('');
+  const consumed = parts.join('');
+  if (consumed.length < text.length) out += text.slice(consumed.length);
+  return out;
 }
 
 function cleanLine(line) {
-  const heading = line.match(/^(\s*#{1,6}\s+)(.*)$/);
+  if (!needsClean(line)) return line;
+  const trail = line.match(/[ \t]*$/)[0];
+  const core = trail ? line.slice(0, -trail.length) : line;
+  let cleaned;
+  const heading = core.match(/^(\s*#{1,6}\s+)(.*)$/);
   if (heading) {
     const rest = cleanSentences(heading[2]).trim();
-    if (!rest || isEffectivelyEmpty(rest)) return '';
-    return `${heading[1].replace(/\s+$/, '')} ${rest}`.replace(/[ \t]{2,}/g, ' ');
+    if (!rest || isEffectivelyEmpty(rest)) cleaned = '';
+    else cleaned = `${heading[1].replace(/\s+$/, '')} ${rest}`.replace(/[ \t]{2,}/g, ' ');
+  } else {
+    const listed = core.match(/^(\s*(?:>\s*)*(?:[-*+]|\d+\.)\s+)(.*)$/);
+    if (listed) {
+      const rest = cleanSentences(listed[2]).trim();
+      cleaned = isEffectivelyEmpty(rest) ? '' : listed[1] + rest;
+    } else {
+      cleaned = cleanSentences(core);
+    }
   }
-  const listed = line.match(/^(\s*(?:>\s*)*(?:[-*+]|\d+\.)\s+)(.*)$/);
-  if (listed) {
-    const rest = cleanSentences(listed[2]).trim();
-    if (isEffectivelyEmpty(rest)) return '';
-    return listed[1] + rest;
-  }
-  return cleanSentences(line);
+  if (cleaned.trim() === '') return '';
+  return cleaned + trail;
 }
 
 /** 清洗即将写入 content/ 的正文。纯函数，不读不写收件箱。 */
@@ -234,7 +285,7 @@ export function cleanImportedBody(body) {
     if (line.trim() === '') { out.push(''); continue; }
     const cleaned = cleanLine(line);
     if (cleaned.trim() === '') continue;
-    out.push(cleaned.replace(/[ \t]+$/g, ''));
+    out.push(cleaned);
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
 }
