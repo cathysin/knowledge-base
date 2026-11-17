@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chooseOutputSlot, cleanImportedBody, fileClockOf, fileDateOf, normalizeAiIntelLayout, normalizeMarketBriefLayout, normalizeNewsImpactLayout, stripLocalPaths } from './import-inbox.mjs';
+import { chooseOutputSlot, cleanImportedBody, ensureTitleDate, fileClockOf, fileDateOf, normalizeAiIntelLayout, normalizeMarketBriefLayout, normalizeNewsImpactLayout, stripLocalPaths } from './import-inbox.mjs';
 import { classifyChanges, isContentPath, parseArgs, parsePorcelainZ, suggestCommitMessage } from './sync-inbox.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
@@ -181,6 +181,68 @@ check('recognizes YYYY-MM-DD and YYYY-MM-DD-HHMM filenames', () => {
   assert.equal(fileDateOf('README.md'), '');
 });
 
+check('page title gains YYYY-MM-DD unless that date is already present', () => {
+  assert.equal(ensureTitleDate('港股新股晨报', '2026-11-17'), '港股新股晨报 · 2026-11-17');
+  assert.equal(ensureTitleDate('每日AI情报｜2026-11-17（周二）', '2026-11-17'), '每日AI情报｜2026-11-17（周二）');
+  assert.equal(ensureTitleDate('每日 AI 情报｜2026-11-17（周二）', '2026-11-17'), '每日 AI 情报｜2026-11-17（周二）');
+  assert.equal(ensureTitleDate('港股开盘前简报 · 2026-11-17', '2026-11-17'), '港股开盘前简报 · 2026-11-17');
+  assert.equal(ensureTitleDate('简报 2026-11-17 早盘', '2026-11-17'), '简报 2026-11-17 早盘');
+  assert.equal(ensureTitleDate('港股新股晨报 · 2026-11-17', '2026-11-17'), '港股新股晨报 · 2026-11-17');
+
+  const inbox = mkdtempSync(join(tmpdir(), 'kb-title-date-'));
+  const ipo = join(inbox, '港股IPO');
+  const ai = join(inbox, '每日AI情报');
+  mkdirSync(ipo);
+  mkdirSync(ai);
+  writeFileSync(join(ipo, '2099-11-17.md'), [
+    '---',
+    '标题: 港股新股晨报',
+    '日期: 2099-11-17',
+    '来源 bot: 港股IPO',
+    '---',
+    '',
+    '# 港股新股晨报',
+    '',
+    '本窗口内没有新股挂牌。',
+    '',
+  ].join('\n'));
+  writeFileSync(join(ai, '2099-11-17.md'), [
+    '---',
+    'title: 每日AI情报｜2099-11-17（周二）',
+    'date: 2099-11-17',
+    'source_bot: 每日AI情报',
+    '---',
+    '',
+    '# 每日 AI 情报｜2099-11-17（周二）',
+    '',
+    '今天有一条公开报道。',
+    '',
+  ].join('\n'));
+  const ipoOut = join(repo, 'content/hk-ipo/2099/2099-11-17-daily.md');
+  const aiOut = join(repo, 'content/ai-intel/2099/2099-11-17-daily.md');
+  const ipoYear = join(repo, 'content/hk-ipo/2099');
+  const aiYear = join(repo, 'content/ai-intel/2099');
+  const ipoYearExisted = existsSync(ipoYear);
+  const aiYearExisted = existsSync(aiYear);
+  try {
+    const result = spawnSync(process.execPath, ['scripts/import-inbox.mjs', inbox], { cwd: repo, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const ipoWritten = readFileSync(ipoOut, 'utf8');
+    const aiWritten = readFileSync(aiOut, 'utf8');
+    assert.match(ipoWritten, /^title: "港股新股晨报 · 2099-11-17"$/m);
+    assert.doesNotMatch(ipoWritten, /港股新股晨报 · 2099-11-17 · 2099-11-17/);
+    assert.doesNotMatch(ipoWritten, /^# 港股新股晨报$/m);
+    assert.match(aiWritten, /^title: "每日AI情报｜2099-11-17（周二）"$/m);
+    assert.doesNotMatch(aiWritten, /2099-11-17 · 2099-11-17/);
+  } finally {
+    rmSync(ipoOut, { force: true });
+    rmSync(aiOut, { force: true });
+    if (!ipoYearExisted) rmSync(ipoYear, { recursive: true, force: true });
+    if (!aiYearExisted) rmSync(aiYear, { recursive: true, force: true });
+    rmSync(inbox, { recursive: true, force: true });
+  }
+});
+
 check('sync classifies content-only changes', () => {
   assert.equal(isContentPath('content/news-impact/2026/2026-11-16-daily.md'), true);
   assert.equal(isContentPath('content-extra/a.md'), false);
@@ -269,7 +331,7 @@ check('import writes cleaned content and does not edit the inbox', () => {
     assert.deepEqual(readFileSync(srcPath), before);
     assert.deepEqual(readFileSync(hhPath), beforeHh);
     const written = readFileSync(out1, 'utf8');
-    assert.match(written, /title: "新闻"/);
+    assert.match(written, /title: "新闻 · 2099-01-01"/);
     assert.doesNotMatch(written, /待确认|待 Cathy|Cathy|仅供内部参考|HTML 主文件|curl 核验|18:00 完整版|\/workspace/);
     assert.match(written, /内部调查/);
     assert.match(written, /数字未确认/);
@@ -277,6 +339,7 @@ check('import writes cleaned content and does not edit the inbox', () => {
     assert.match(written, /仅供参考，不构成投资建议。/);
     assert.equal(written.trimEnd().endsWith('仅供参考，不构成投资建议。'), true);
     const hh = readFileSync(out2, 'utf8');
+    assert.match(hh, /title: "午间 · 2099-01-02"/);
     assert.match(hh, /date: 2099-01-02/);
     assert.match(hh, /内部调查/);
     assert.match(hh, /数字未确认/);

@@ -11,6 +11,8 @@
 // 写入 content/ 之前清洗正文（T035）：去掉内部流程句和 Cathy /「仅供内部参考」字样，
 // 以及整句指向 HTML 文件/表的「见 HTML」「见 HTML 主文件」。
 // 保留「不构成投资建议」以及新闻事实里的「内部调查」「未确认」「未经公司确认」。
+// 页标题如果还没有该篇日期（YYYY-MM-DD），写入时补上「 · YYYY-MM-DD」。
+// 标题里已经出现同一日期（间隔符可以是 ·、｜ 或空格）则不再补。
 // 删掉短语或句子时，同一行其余字节保持原样：不重排 ， / 、 / ；，
 // 不动数字里的英文逗号（两侧都是 ASCII 数字），保留被留下的行的行尾空格。
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
@@ -50,6 +52,18 @@ const SENSITIVE = [
 
 // 本机路径：/workspace/、/home/、/cursor/ 等开头。
 const LOCAL_PATH = /(?:^|[\s`'"(（：:，,])\/(?:workspace|home|cursor|tmp|root|Users|mnt|opt)\//;
+
+/**
+ * 页标题还没有该篇 YYYY-MM-DD 时，补上「 · YYYY-MM-DD」。
+ * 同一日期已经出现在标题里（·、｜、空格或其他间隔符都可以）则原样返回。
+ */
+export function ensureTitleDate(title, date) {
+  const text = String(title ?? '').trim();
+  const ymd = String(date ?? '').trim().slice(0, 10);
+  if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return text;
+  if (text.includes(ymd)) return text;
+  return `${text} · ${ymd}`;
+}
 
 /** YYYY-MM-DD.md 与 YYYY-MM-DD-HHMM.md 取日期；其他仍含日期的文件名保持原有兜底。 */
 export function fileDateOf(filename) {
@@ -563,6 +577,7 @@ function main() {
       if (LOCAL_PATH.test(body)) errs.push('删句后仍含本机路径');
       if (errs.length) { skipped.push({ src, reason: errs.join('、') }); hadError = true; continue; }
 
+      title = ensureTitleDate(title, date);
       const outPath = join(CONTENT, category, date.slice(0, 4), `${date}-${slot}.md`);
       const rel = relative(CONTENT, outPath);
       if (rel.startsWith('..') || rel.includes(`..${sep}`)) throw new Error(`输出路径越出 content/：${outPath}`);
