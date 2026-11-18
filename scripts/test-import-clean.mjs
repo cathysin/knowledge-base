@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chooseOutputSlot, cleanImportedBody, ensureTitleDate, fileClockOf, fileDateOf, normalizeAiIntelLayout, normalizeMarketBriefLayout, normalizeNewsImpactLayout, stripLocalPaths } from './import-inbox.mjs';
+import { chooseOutputSlot, cleanImportedBody, ensureTitleDate, fileClockOf, fileDateOf, normalizeAiIntelLayout, normalizeEtfTables, normalizeMarketBriefLayout, normalizeNewsImpactLayout, stripLocalPaths } from './import-inbox.mjs';
 import { classifyChanges, isContentPath, parseArgs, parsePorcelainZ, suggestCommitMessage } from './sync-inbox.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
@@ -27,6 +27,19 @@ const THREE = [
   '完整可搜可排序总表见 HTML 主文件。',
   '链接已 curl 核验为 HTTP 200。',
 ];
+
+check('ETF table repair preserves data, existing tables and protected blocks', () => {
+  const header = '| # | 代码 | 名称 | 权重% | 现价 | 涨跌幅 | 贡献pp |';
+  const row = '| 1 | 2526.HK | 德适-B | 0.33 | 105.0 | +23.53% | +0.0776 |';
+  const input = `${header}\n${row}\n`;
+  const fixed = normalizeEtfTables(input);
+  assert.equal(fixed, `${header}\n| --- | --- | --- | --- | --- | --- | --- |\n${row}\n`);
+  assert.equal(normalizeEtfTables(fixed), fixed);
+  assert.equal(fixed.replace('| --- | --- | --- | --- | --- | --- | --- |\n', ''), input);
+  const protectedText = `\`\`\`md\n${input}\`\`\`\n<details>\n${input}</details>\n`;
+  assert.equal(normalizeEtfTables(protectedText), protectedText);
+  assert.equal(normalizeEtfTables(`${header}\n| 1 | not-a-code | 文本 | 1 | 2 | 3 | 4 |\n`), `${header}\n| 1 | not-a-code | 文本 | 1 | 2 | 3 | 4 |\n`);
+});
 
 check('market brief sections remain semantic and normalized idempotently', () => {
   const src = '1. 全天收市表现\n恒指 23,753.84 点。\n来源：港股360。\n\n2. 板块涨跌与个股\n行业表现。\n下跌方面，联想跌 5.9%。\n\n3. 南向资金\n净卖出 42.26 亿港元。\n\n4. 明日关注\n- 关注业绩。\n';

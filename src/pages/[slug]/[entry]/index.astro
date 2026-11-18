@@ -45,7 +45,7 @@ const showSummary=post&&!plainForCompare(post.body??'').slice(0,1600).includes(p
   </Base>
 ) : post&&Content ? (
   <Base topic={post.data.title} description={post.data.summary}>
-    <article class="page page-article" data-pagefind-body>
+    <article class="page page-article" data-category={cat.slug} data-pagefind-body>
       <div data-pagefind-ignore="all"><Breadcrumb items={[{label:'首页',href:withBase('/')},{label:cat.name,href:withBase(`/${cat.slug}/`)}]} /></div>
       <header class="article-heading"><p class="article-category"><a href={withBase(`/${cat.slug}/`)}>{cat.name}</a><span>{slotLabel(post.data.slot)}</span></p><h1 class="page-title" data-pagefind-meta="title">{post.data.title}</h1>{showSummary&&<p class="article-summary">{post.data.summary}</p>}<p class="article-meta"><span class="visually-hidden" data-pagefind-meta="category">{cat.name}</span><time datetime={ymd(post.data.date)} data-pagefind-meta="date">{metaDate}</time><span data-pagefind-meta="slot">{slotLabel(post.data.slot)}</span><span>来源：{post.data.source_bot}</span>{post.data.as_of&&<span>数据截至 {ymd(post.data.as_of)}</span>}</p>{lessonInfo&&<p class="article-lesson"><span class="lesson-serial">{lessonInfo.serial}</span><span>主题 {lessonInfo.topicIndex}/{lessonInfo.topicTotal} · {lessonInfo.topic} · {lessonInfo.section}</span></p>}</header>
       {headings.length>0&&<details class="article-mobile-toc" data-pagefind-ignore="all"><summary>本文目录 <span>{headings.length} 个部分</span></summary><nav aria-label="手机本文目录">{headings.map((heading)=><a href={`#${heading.slug}`} class:list={{'toc-subheading':heading.depth===3}}>{heading.text}</a>)}</nav></details>}

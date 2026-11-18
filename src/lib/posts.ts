@@ -26,12 +26,15 @@ export function postHref(category: string, date: Date, slot: string): string {
 }
 
 export function slotLabel(slot: string): string {
-  return SLOT_LABEL[slot] ?? slot;
+  const time = slot.match(/^([01]\d|2[0-3])([0-5]\d)$/);
+  return SLOT_LABEL[slot] ?? (time ? `${time[1]}:${time[2]}` : slot);
 }
 
 export function comparePosts(a: Post, b: Post): number {
   return b.data.date.getTime() - a.data.date.getTime()
-    || SLOT_ORDER.indexOf(a.data.slot) - SLOT_ORDER.indexOf(b.data.slot);
+    || SLOT_ORDER.indexOf(a.data.slot) - SLOT_ORDER.indexOf(b.data.slot)
+    || (/^\d{4}$/.test(a.data.slot) && /^\d{4}$/.test(b.data.slot)
+      ? b.data.slot.localeCompare(a.data.slot) : 0);
 }
 
 export async function postsInCategory(slug: string): Promise<Post[]> {

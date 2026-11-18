@@ -199,3 +199,16 @@
 .prose>p.article-keypoint,.prose :is(h2[id^="今日结论"],h2[id^="结论先看"])+p{position:relative;isolation:isolate;padding:24px 0;background:transparent;border-radius:0}
 .prose>p.article-keypoint::after,.prose :is(h2[id^="今日结论"],h2[id^="结论先看"])+p::after{content:'';position:absolute;inset:0 -20px;z-index:-1;background:#eef4fb;border-radius:10px}
 @media(max-width:48em){.prose>p.article-keypoint,.prose :is(h2[id^="今日结论"],h2[id^="结论先看"])+p{padding:20px 0}.prose>p.article-keypoint::after,.prose :is(h2[id^="今日结论"],h2[id^="结论先看"])+p::after{inset-inline:-12px}}
+
+/* ETF reports: keep market fields and tables readable within the shared article width. */
+.page-article[data-category="etf-2835"] .prose :is(h2[id^="盘中结论"],h2[id^="收市结论"],h2[id^="早报结论"])+p{position:relative;isolation:isolate;padding:24px 0;background:transparent;color:#18283d;line-height:1.9}
+.page-article[data-category="etf-2835"] .prose :is(h2[id^="盘中结论"],h2[id^="收市结论"],h2[id^="早报结论"])+p::after{content:'';position:absolute;inset:0 -20px;z-index:-1;background:#eef4fb;border-radius:10px}
+.page-article[data-category="etf-2835"] .prose ul:has(>li[data-etf-field]){list-style:none;padding-left:0;margin-block:24px}
+.page-article[data-category="etf-2835"] .prose li[data-etf-field]{padding:16px 0;border-top:1px solid var(--c-line);line-height:1.9}
+.page-article[data-category="etf-2835"] .prose li[data-etf-field]+li[data-etf-field]{margin-top:0}
+.page-article[data-category="etf-2835"] .etf-field-label{display:block;margin-bottom:4px;font-size:.8125rem;font-weight:600;line-height:1.6;color:#526376}
+.page-article[data-category="etf-2835"] .prose li[data-etf-field="出处"],.page-article[data-category="etf-2835"] .prose li[data-etf-field="相关"]{font-size:.875rem;line-height:1.8;color:var(--c-muted)}
+.page-article[data-category="etf-2835"] .prose li[data-etf-field="出处"] ul{margin-block:8px 0;overflow-wrap:anywhere}
+.page-article[data-category="etf-2835"] .table-wrap th,.page-article[data-category="etf-2835"] .table-wrap td{font-variant-numeric:tabular-nums}
+.page-article[data-category="etf-2835"] .table-wrap tbody tr:nth-child(even){background:#f8fafc}
+@media(max-width:48em){.page-article[data-category="etf-2835"] .prose :is(h2[id^="盘中结论"],h2[id^="收市结论"],h2[id^="早报结论"])+p{padding:20px 0}.page-article[data-category="etf-2835"] .prose :is(h2[id^="盘中结论"],h2[id^="收市结论"],h2[id^="早报结论"])+p::after{inset-inline:-12px}.page-article[data-category="etf-2835"] .prose li[data-etf-field]{padding-block:14px}}

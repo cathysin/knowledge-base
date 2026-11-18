@@ -511,6 +511,40 @@ export function normalizeAiIntelLayout(body) {
   return output.join('\n');
 }
 
+/** 仅为已知 2835 持仓/涨跌榜表头补缺失的 Markdown 分隔行。 */
+export function normalizeEtfTables(body) {
+  const lines = String(body).split(/\r?\n/);
+  const out = [];
+  let fence = null;
+  let details = 0;
+  const cells = (line) => /^\s*\|.*\|\s*$/.test(line) ? line.trim().slice(1, -1).split('|').map((cell) => cell.trim()) : [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fenceMarker = line.match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (fenceMarker && (!fence || (fenceMarker[1][0] === fence[0] && fenceMarker[1].length >= fence.length))) {
+      fence = fence ? null : fenceMarker[1];
+      out.push(line);
+      continue;
+    }
+    if (fence) { out.push(line); continue; }
+    const opens = (line.match(/<details\b/gi) ?? []).length;
+    const closes = (line.match(/<\/details\s*>/gi) ?? []).length;
+    if (details || opens) { details = Math.max(0, details + opens - closes); out.push(line); continue; }
+    const header = cells(line);
+    const next = cells(lines[i + 1] ?? '');
+    const seven = ['#', '代码', '名称', '权重%', '现价', '涨跌幅', '贡献pp'];
+    const ten = ['代码', '名称', '权重%', '现价', '涨跌幅', '最高', '最低', '成交额'];
+    const knownSeven = header.length === 7 && seven.every((value, n) => header[n] === value);
+    const knownTen = header.length === 10 && ten.every((value, n) => header[n] === value) && ['备注', '异动'].includes(header[8]) && header[9] === '贡献pp';
+    const codeColumn = knownSeven ? 1 : 0;
+    out.push(line);
+    if ((knownSeven || knownTen) && next.length === header.length && /^\d{4,5}\.HK$/i.test(next[codeColumn])) {
+      out.push(`| ${header.map(() => '---').join(' | ')} |`);
+    }
+  }
+  return out.join('\n');
+}
+
 function cleanedSummary(summary) {
   if (!summary) return '';
   const s = cleanImportedBody(summary).replace(/\s+/g, ' ').trim();
@@ -561,6 +595,7 @@ function main() {
       if (category === 'market-brief') body = normalizeMarketBriefLayout(body);
       if (category === 'news-impact') body = normalizeNewsImpactLayout(body);
       if (category === 'ai-intel') body = normalizeAiIntelLayout(body);
+      if (category === 'etf-2835') body = normalizeEtfTables(body);
       const detected = detectSlot(title, data.slot);
       const sourceRel = relative(INBOX, src).split(sep).join('/');
       const clock = fileClockOf(f);

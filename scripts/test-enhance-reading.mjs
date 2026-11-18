@@ -18,5 +18,13 @@ try {
   run(); assert.equal(readFileSync(path, 'utf8'), output);
   writeFileSync(path, source.replace('日期：2026-11-16（星期一）', '日期：2026-11-16'));
   run(); assert.ok(readFileSync(path, 'utf8').includes('<p>测试标题（星期一）</p>'));
+  const etf = '<article data-category="etf-2835"><h1>2835</h1><div class="prose"><h2 id="盘中结论">盘中结论</h2><p>' + '基本情况。'.repeat(60) + '组合表现。拖累情况。</p><ul><li>事实：数据 0.33</li><li>出处：<ul><li><a href="https://example.org/a">原文</a></li></ul></li></ul></div><div class="article-reading-end"></div></article>';
+  writeFileSync(path, etf); run();
+  const rendered = readFileSync(path, 'utf8');
+  assert.ok(rendered.includes('。<br><br>组合表现。<br><br>拖累情况。'));
+  assert.ok(rendered.includes('<li data-etf-field="事实"><span class="etf-field-label">事实：</span>数据 0.33'));
+  assert.ok(rendered.includes('href="https://example.org/a"'));
+  assert.equal(rendered.replaceAll('<br><br>', '').replace(/ data-etf-field="[^"]+"/g, '').replace(/<span class="etf-field-label">([^<]+)<\/span>/g, '$1'), etf);
+  run(); assert.equal(readFileSync(path, 'utf8'), rendered);
   console.log('reading enhancement: information, links, tables and idempotence passed');
 } finally { rmSync(dir, { recursive: true, force: true }); }

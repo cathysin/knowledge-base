@@ -15,7 +15,7 @@ function walk(dir) {
     let leadFound = false;
     let firstParagraph = true;
     const title = (html.slice(0, start).match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? '').replace(/<[^>]*>/g, '').replace(/\s/g, '');
-    const segment = html.slice(start, end).replace(/<p>([\s\S]*?)<\/p>/g, (whole, inner) => {
+    let segment = html.slice(start, end).replace(/<p>([\s\S]*?)<\/p>/g, (whole, inner) => {
       const plain = inner.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
       if (firstParagraph) {
         firstParagraph = false;
@@ -36,6 +36,14 @@ function walk(dir) {
       if (/^(?:来源[：:]|（来源[：:])/.test(plain)) return `<p class="article-source-note">${inner}</p>`;
       return whole;
     });
+    if (html.slice(0, start).includes('data-category="etf-2835"')) {
+      // Preserve list text and semantics while making the report's named fields scannable.
+      segment = segment.replace(/<li>(时点|事实|宏观背景|成分股因果|权重近似贡献|相关|出处|标的|大盘|组合|深演智能|拖累|支撑|ETF)([：:])/g,
+        (_, label, colon) => `<li data-etf-field="${label}"><span class="etf-field-label">${label}${colon}</span>`);
+      // Separate long plain-text conclusions at explicit topic transitions, preserving every character.
+      segment = segment.replace(/(<h2\b[^>]*id="(?:盘中结论|收市结论|早报结论|今日结论)[^"]*"[^>]*>[\s\S]*?<\/h2>\s*<p>)([^<]{200,})(<\/p>)/g,
+        (_, open, body, close) => open + body.replace(/。(?=大盘|组合|拖累|正贡献|ETF)/g, '。<br><br>') + close);
+    }
     if (segment !== html.slice(start, end)) { writeFileSync(path, html.slice(0,start)+segment+html.slice(end)); pages++; }
   }
 }
